@@ -1,0 +1,13 @@
+diff --git a/node_modules/wired-elements/lib/wired-lib.js b/node_modules/wired-elements/lib/wired-lib.js
+index 5b1d153..9d3ec39 100644
+--- a/node_modules/wired-elements/lib/wired-lib.js
++++ b/node_modules/wired-elements/lib/wired-lib.js
+@@ -90,7 +90,7 @@ export function ellipse(parent, x, y, width, height, seed) {
+ }
+ export function hachureFill(points, seed) {
+     const hf = new ZigZagFiller(fillHelper);
+-    const ops = hf.fillPolygon(points, options(seed));
++    const ops = hf.fillPolygons([points], options(seed));
+     return createPathNode(ops, null);
+ }
+ export function hachureEllipseFill(cx, cy, width, height, seed) {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { WiredCard, WiredButton, WiredInput, WiredCombo } from 'wired-elements-react'
+import { WiredCard, WiredButton, WiredInput, WiredCombo, WiredItem } from 'wired-elements-react'
 import './PageLayout.css'
 
 function GroupDetailPage({ currentUser }) {
@@ -200,13 +200,13 @@ function GroupDetailPage({ currentUser }) {
                 value={newMemberUsername}
                 onChange={(e) => setNewMemberUsername(e.target.value)}
               />
-              <WiredCombo 
+              <WiredCombo
                 selected={newMemberRole}
-                onChange={(e) => setNewMemberRole(e.detail.selected)}
+                onselected={(e) => {setNewMemberRole(e.detail.selected)}}
               >
-                <wired-item value="MEMBER" >Member</wired-item>
-                <wired-item value="MANAGER" >Manager</wired-item>
-                <wired-item value="OWNER" >Owner</wired-item>
+                <WiredItem value="MEMBER" >Member</WiredItem>
+                <WiredItem value="MANAGER" >Manager</WiredItem>
+                <WiredItem value="OWNER" >Owner</WiredItem>
               </WiredCombo>
               <WiredButton onClick={addMember}>Add Member</WiredButton>
             </div>

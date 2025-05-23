@@ -17,6 +17,7 @@ wired-tabs {
 
 wired-card {
   --wired-combo-popup-bg: #242424;
+  --wired-item-selected-bg: #d51111;
 }
 
 wired-item {
