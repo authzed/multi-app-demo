@@ -9,6 +9,36 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  spicedb-migrate:
+    image: authzed/spicedb:latest
+    command: "migrate head"
+    environment:
+      - SPICEDB_DATASTORE_ENGINE=postgres
+      - SPICEDB_DATASTORE_CONN_URI=postgres://demo:demo123@postgres:5432/spicedb?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  spicedb:
+    image: authzed/spicedb:latest
+    command: "serve"
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+      - "50051:50051"
+    environment:
+      - SPICEDB_GRPC_PRESHARED_KEY=somerandomkeyhere
+      - SPICEDB_DATASTORE_ENGINE=postgres
+      - SPICEDB_DATASTORE_CONN_URI=postgres://demo:demo123@postgres:5432/spicedb?sslmode=disable
+    depends_on:
+      - postgres
+      - spicedb-migrate
 
   groups-service:
     build: ./groups-service
@@ -17,8 +47,11 @@ services:
     environment:
       - GIN_MODE=release
       - DATABASE_URL=postgres://demo:demo123@postgres:5432/groups_db
+      - SPICEDB_ENDPOINT=spicedb:50051
+      - SPICEDB_TOKEN=somerandomkeyhere
     depends_on:
       - postgres
+      - spicedb
 
   mail-service:
     build: ./mail-service
@@ -27,8 +60,11 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgres://demo:demo123@postgres:5432/mail_db
+      - SPICEDB_ENDPOINT=spicedb:50051
+      - SPICEDB_TOKEN=somerandomkeyhere
     depends_on:
       - postgres
+      - spicedb
 
   docs-service:
     build: ./docs-service
@@ -39,8 +75,11 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/docs_db
       - SPRING_DATASOURCE_USERNAME=demo
       - SPRING_DATASOURCE_PASSWORD=demo123
+      - SPICEDB_ENDPOINT=spicedb:50051
+      - SPICEDB_TOKEN=somerandomkeyhere
     depends_on:
       - postgres
+      - spicedb
 
   frontend:
     build: ./frontend
