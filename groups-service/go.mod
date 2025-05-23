@@ -4,7 +4,10 @@ go 1.24
 
 toolchain go1.24.2
 
-require github.com/gin-gonic/gin v1.9.1
+require (
+	github.com/gin-gonic/gin v1.9.1
+	github.com/lib/pq v1.10.9
+)
 
 require (
 	github.com/bytedance/sonic v1.9.1 // indirect

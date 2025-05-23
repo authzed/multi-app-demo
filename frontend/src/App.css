@@ -29,10 +29,12 @@ p, span, div, label {
   margin: 0;
   padding: 0;
   text-align: left;
+  width: 100%;
 }
 
 .app {
   min-height: 100vh;
+  width: 100%;
 }
 
 .main-content {
