@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
 import './PageLayout.css'
 
 function GroupsPage({ currentUser }) {
+  const navigate = useNavigate()
   const [groups, setGroups] = useState([])
   const [newGroup, setNewGroup] = useState({
     name: '',
@@ -121,7 +123,14 @@ function GroupsPage({ currentUser }) {
               {groups.map(group => (
                 <WiredCard key={group.id} className="item-card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div><strong>{group.name}</strong></div>
+                    <div 
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => navigate(`/groups/${group.id}`)}
+                    >
+                      <strong style={{ color: '#007bff', textDecoration: 'underline' }}>
+                        {group.name}
+                      </strong>
+                    </div>
                     <WiredButton 
                       style={{ 
                         fontSize: '12px', 

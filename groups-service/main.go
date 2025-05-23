@@ -269,6 +269,97 @@ func getGroupMembers(c *gin.Context) {
 	c.JSON(http.StatusOK, members)
 }
 
+func addGroupMember(c *gin.Context) {
+	groupIDStr := c.Param("id")
+	groupID, err := strconv.Atoi(groupIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid group ID"})
+		return
+	}
+
+	type AddMemberRequest struct {
+		Username string `json:"username" binding:"required"`
+		Role     string `json:"role" binding:"required"`
+	}
+
+	var req AddMemberRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate role
+	if req.Role != "OWNER" && req.Role != "MANAGER" && req.Role != "MEMBER" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Must be OWNER, MANAGER, or MEMBER"})
+		return
+	}
+
+	// Check if group exists
+	var exists bool
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE id = $1)", groupID).Scan(&exists)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check group existence"})
+		return
+	}
+
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
+		return
+	}
+
+	// Add member to group
+	_, err = db.Exec(`
+		INSERT INTO group_memberships (group_id, username, role) 
+		VALUES ($1, $2, $3)
+		ON CONFLICT (group_id, username) 
+		DO UPDATE SET role = EXCLUDED.role
+	`, groupID, req.Username, req.Role)
+
+	if err != nil {
+		log.Printf("Failed to add member to group %d: %v", groupID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add member to group"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Member added successfully"})
+}
+
+func removeGroupMember(c *gin.Context) {
+	groupIDStr := c.Param("id")
+	username := c.Param("username")
+	
+	groupID, err := strconv.Atoi(groupIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid group ID"})
+		return
+	}
+
+	// Remove member from group
+	result, err := db.Exec(`
+		DELETE FROM group_memberships 
+		WHERE group_id = $1 AND username = $2
+	`, groupID, username)
+
+	if err != nil {
+		log.Printf("Failed to remove member from group %d: %v", groupID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove member from group"})
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check operation result"})
+		return
+	}
+
+	if rowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Member not found in group"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Member removed successfully"})
+}
+
 func deleteGroup(c *gin.Context) {
 	groupIDStr := c.Param("id")
 	groupID, err := strconv.Atoi(groupIDStr)
@@ -317,6 +408,8 @@ func main() {
 	r.POST("/groups", createGroup)
 	r.DELETE("/groups/:id", deleteGroup)
 	r.GET("/groups/:id/members", getGroupMembers)
+	r.POST("/groups/:id/members", addGroupMember)
+	r.DELETE("/groups/:id/members/:username", removeGroupMember)
 
 	log.Println("Groups service starting on port 3001")
 	r.Run(":3001")

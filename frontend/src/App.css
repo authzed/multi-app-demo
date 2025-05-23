@@ -15,13 +15,29 @@ wired-tabs {
   font-family: 'Gloria Hallelujah', cursive, sans-serif !important;
 }
 
+wired-card {
+  --wired-combo-popup-bg: #242424;
+}
+
+wired-item {
+  opacity: 1.0;
+}
+
 /* Apply to all headings */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: 'Gloria Hallelujah', cursive, sans-serif;
 }
 
 /* Apply to all paragraphs and text */
-p, span, div, label {
+p,
+span,
+div,
+label {
   font-family: 'Gloria Hallelujah', cursive, sans-serif;
 }
 
@@ -51,9 +67,11 @@ p, span, div, label {
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
@@ -62,6 +80,7 @@ p, span, div, label {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }

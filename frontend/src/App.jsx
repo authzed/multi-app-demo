@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { useState } from 'react'
 import Header from './components/Header'
 import GroupsPage from './pages/GroupsPage'
+import GroupDetailPage from './pages/GroupDetailPage'
 import MailPage from './pages/MailPage'
 import DocsPage from './pages/DocsPage'
 import './App.css'
@@ -25,6 +26,7 @@ function App() {
         <main className="main-content">
           <Routes>
             <Route path="/groups" element={<GroupsPage currentUser={currentUser} />} />
+            <Route path="/groups/:id" element={<GroupDetailPage currentUser={currentUser} />} />
             <Route path="/mail" element={<MailPage currentUser={currentUser} />} />
             <Route path="/docs" element={<DocsPage currentUser={currentUser} />} />
             <Route path="/" element={<GroupsPage currentUser={currentUser} />} />
