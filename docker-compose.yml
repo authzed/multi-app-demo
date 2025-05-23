@@ -1,0 +1,30 @@
+services:
+  groups-service:
+    build: ./groups-service
+    ports:
+      - "3001:3001"
+    environment:
+      - GIN_MODE=release
+
+  mail-service:
+    build: ./mail-service
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+
+  docs-service:
+    build: ./docs-service
+    ports:
+      - "3003:3003"
+    environment:
+      - SPRING_PROFILES_ACTIVE=production
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - groups-service
+      - mail-service
+      - docs-service
