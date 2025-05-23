@@ -1,8 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&display=swap');
+
+* {
+  font-family: 'Gloria Hallelujah', cursive, sans-serif;
+}
+
+/* Apply hand-drawn fonts to wired-elements */
+wired-button,
+wired-card,
+wired-input,
+wired-textarea,
+wired-listbox,
+wired-tab,
+wired-tabs {
+  font-family: 'Gloria Hallelujah', cursive, sans-serif !important;
+}
+
+/* Apply to all headings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Gloria Hallelujah', cursive, sans-serif;
+}
+
+/* Apply to all paragraphs and text */
+p, span, div, label {
+  font-family: 'Gloria Hallelujah', cursive, sans-serif;
+}
+
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.main-content {
+  margin-top: 80px;
+  padding: 0;
+  width: 100%;
+  min-height: calc(100vh - 80px);
+  overflow-x: hidden;
 }
 
 .logo {

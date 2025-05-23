@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { WiredCard, WiredButton, WiredInput, WiredListbox } from 'wired-elements-react'
+import { WiredCard, WiredButton, WiredInput } from 'wired-elements-react'
+import './PageLayout.css'
 
-function GroupsPage() {
+function GroupsPage({ currentUser }) {
   const [groups, setGroups] = useState([])
   const [newGroupName, setNewGroupName] = useState('')
 
@@ -37,29 +38,44 @@ function GroupsPage() {
   }
 
   return (
-    <div style={{ margin: '20px' }}>
-      <WiredCard>
-        <h2>Groups Service</h2>
-        
-        <div style={{ marginBottom: '20px' }}>
-          <WiredInput 
-            placeholder="Group name"
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-            style={{ marginRight: '10px' }}
-          />
-          <WiredButton onClick={createGroup}>Create Group</WiredButton>
-        </div>
-
-        <WiredCard>
-          <h3>Existing Groups</h3>
-          {groups.map(group => (
-            <div key={group.id} style={{ padding: '10px', borderBottom: '1px solid #ccc' }}>
-              <strong>{group.name}</strong> (ID: {group.id})
-            </div>
-          ))}
+    <div className="page-container">
+      <div className="page-header">
+        <h2>Groups Service - {currentUser.name}</h2>
+      </div>
+      
+      <div className="page-content">
+        <WiredCard className="form-section">
+          <h3>Create New Group</h3>
+          <div className="form-row">
+            <WiredInput 
+              className="form-input"
+              placeholder="Group name"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+            />
+            <WiredButton onClick={createGroup}>Create Group</WiredButton>
+          </div>
         </WiredCard>
-      </WiredCard>
+
+        <div className="content-section">
+          <WiredCard>
+            <h3>Existing Groups</h3>
+            <div className="items-grid">
+              {groups.map(group => (
+                <WiredCard key={group.id} className="item-card">
+                  <div><strong>{group.name}</strong></div>
+                  <div style={{ color: '#666', fontSize: '14px' }}>ID: {group.id}</div>
+                </WiredCard>
+              ))}
+              {groups.length === 0 && (
+                <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
+                  No groups created yet. Create your first group above!
+                </p>
+              )}
+            </div>
+          </WiredCard>
+        </div>
+      </div>
     </div>
   )
 }

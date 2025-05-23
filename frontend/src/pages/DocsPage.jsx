@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
+import './PageLayout.css'
 
-function DocsPage() {
+function DocsPage({ currentUser }) {
   const [documents, setDocuments] = useState([])
   const [newDoc, setNewDoc] = useState({ title: '', content: '', owner: '' })
 
   useEffect(() => {
     fetchDocuments()
-  }, [])
+    setNewDoc({ ...newDoc, owner: currentUser.name })
+  }, [currentUser])
 
   const fetchDocuments = async () => {
     try {
@@ -30,53 +32,73 @@ function DocsPage() {
       })
       const createdDoc = await response.json()
       setDocuments([...documents, createdDoc])
-      setNewDoc({ title: '', content: '', owner: '' })
+      setNewDoc({ title: '', content: '', owner: currentUser.name })
     } catch (error) {
       console.error('Error creating document:', error)
     }
   }
 
   return (
-    <div style={{ margin: '20px' }}>
-      <WiredCard>
-        <h2>Docs Service</h2>
-        
-        <WiredCard style={{ marginBottom: '20px' }}>
+    <div className="page-container">
+      <div className="page-header">
+        <h2>Docs Service - {currentUser.name}</h2>
+      </div>
+      
+      <div className="page-content">
+        <WiredCard className="form-section">
           <h3>Create Document</h3>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="form-row">
             <WiredInput 
-              placeholder="Title"
+              className="form-input"
+              placeholder="Document title"
               value={newDoc.title}
               onChange={(e) => setNewDoc({...newDoc, title: e.target.value})}
-              style={{ width: '100%', marginBottom: '10px' }}
             />
+          </div>
+          <div className="form-row">
             <WiredInput 
+              className="form-input"
               placeholder="Owner"
               value={newDoc.owner}
               onChange={(e) => setNewDoc({...newDoc, owner: e.target.value})}
-              style={{ width: '100%', marginBottom: '10px' }}
             />
+          </div>
+          <div className="form-row">
             <WiredTextarea 
-              placeholder="Content"
+              className="form-input"
+              placeholder="Document content..."
               value={newDoc.content}
               onChange={(e) => setNewDoc({...newDoc, content: e.target.value})}
-              style={{ width: '100%', marginBottom: '10px' }}
+              rows="6"
             />
+          </div>
+          <div className="form-row">
             <WiredButton onClick={createDocument}>Create Document</WiredButton>
           </div>
         </WiredCard>
 
-        <WiredCard>
-          <h3>Documents</h3>
-          {documents.map(doc => (
-            <WiredCard key={doc.id} style={{ margin: '10px 0' }}>
-              <div><strong>Title:</strong> {doc.title}</div>
-              <div><strong>Owner:</strong> {doc.owner}</div>
-              <div><strong>Content:</strong> {doc.content}</div>
-            </WiredCard>
-          ))}
-        </WiredCard>
-      </WiredCard>
+        <div className="content-section">
+          <WiredCard>
+            <h3>Documents</h3>
+            <div className="items-grid">
+              {documents.map(doc => (
+                <WiredCard key={doc.id} className="item-card">
+                  <div><strong>Title:</strong> {doc.title}</div>
+                  <div><strong>Owner:</strong> {doc.owner}</div>
+                  <div style={{ marginTop: '10px', color: '#555', fontSize: '14px' }}>
+                    {doc.content ? doc.content.substring(0, 150) + (doc.content.length > 150 ? '...' : '') : 'No content'}
+                  </div>
+                </WiredCard>
+              ))}
+              {documents.length === 0 && (
+                <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
+                  No documents created yet. Create your first document above!
+                </p>
+              )}
+            </div>
+          </WiredCard>
+        </div>
+      </div>
     </div>
   )
 }

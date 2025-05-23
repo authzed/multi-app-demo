@@ -1,0 +1,61 @@
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: #f8f9fa;
+  border-bottom: 2px solid #333;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  font-family: 'Gloria Hallelujah', cursive, sans-serif;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  padding: 0 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 28px;
+  color: #333;
+  font-weight: 700;
+  font-family: 'Gloria Hallelujah', cursive, sans-serif;
+}
+
+.app-nav {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.app-nav a {
+  text-decoration: none;
+}
+
+.app-nav a.active wired-button {
+  background: #007bff;
+  color: white;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.main-content {
+  margin-top: 80px;
+  padding: 20px;
+}

@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
+import './PageLayout.css'
 
-function MailPage() {
+function MailPage({ currentUser }) {
   const [emails, setEmails] = useState([])
   const [newEmail, setNewEmail] = useState({ subject: '', from: '', body: '' })
 
   useEffect(() => {
     fetchEmails()
-  }, [])
+    setNewEmail({ ...newEmail, from: currentUser.username + '@company.com' })
+  }, [currentUser])
 
   const fetchEmails = async () => {
     try {
@@ -30,53 +32,71 @@ function MailPage() {
       })
       const createdEmail = await response.json()
       setEmails([...emails, createdEmail])
-      setNewEmail({ subject: '', from: '', body: '' })
+      setNewEmail({ subject: '', from: currentUser.username + '@company.com', body: '' })
     } catch (error) {
       console.error('Error sending email:', error)
     }
   }
 
   return (
-    <div style={{ margin: '20px' }}>
-      <WiredCard>
-        <h2>Mail Service</h2>
-        
-        <WiredCard style={{ marginBottom: '20px' }}>
+    <div className="page-container">
+      <div className="page-header">
+        <h2>Mail Service - {currentUser.name}</h2>
+      </div>
+      
+      <div className="page-content">
+        <WiredCard className="form-section">
           <h3>Compose Email</h3>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="form-row">
             <WiredInput 
+              className="form-input"
               placeholder="From"
               value={newEmail.from}
               onChange={(e) => setNewEmail({...newEmail, from: e.target.value})}
-              style={{ width: '100%', marginBottom: '10px' }}
             />
+          </div>
+          <div className="form-row">
             <WiredInput 
+              className="form-input"
               placeholder="Subject"
               value={newEmail.subject}
               onChange={(e) => setNewEmail({...newEmail, subject: e.target.value})}
-              style={{ width: '100%', marginBottom: '10px' }}
             />
+          </div>
+          <div className="form-row">
             <WiredTextarea 
-              placeholder="Body"
+              className="form-input"
+              placeholder="Email body..."
               value={newEmail.body}
               onChange={(e) => setNewEmail({...newEmail, body: e.target.value})}
-              style={{ width: '100%', marginBottom: '10px' }}
+              rows="4"
             />
+          </div>
+          <div className="form-row">
             <WiredButton onClick={sendEmail}>Send Email</WiredButton>
           </div>
         </WiredCard>
 
-        <WiredCard>
-          <h3>Inbox</h3>
-          {emails.map(email => (
-            <WiredCard key={email.id} style={{ margin: '10px 0' }}>
-              <div><strong>From:</strong> {email.from}</div>
-              <div><strong>Subject:</strong> {email.subject}</div>
-              <div><strong>Body:</strong> {email.body}</div>
-            </WiredCard>
-          ))}
-        </WiredCard>
-      </WiredCard>
+        <div className="content-section">
+          <WiredCard>
+            <h3>Inbox</h3>
+            <div className="items-grid">
+              {emails.map(email => (
+                <WiredCard key={email.id} className="item-card">
+                  <div><strong>From:</strong> {email.from}</div>
+                  <div><strong>Subject:</strong> {email.subject}</div>
+                  <div style={{ marginTop: '10px', color: '#555' }}>{email.body}</div>
+                </WiredCard>
+              ))}
+              {emails.length === 0 && (
+                <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
+                  No emails in inbox. Send your first email above!
+                </p>
+              )}
+            </div>
+          </WiredCard>
+        </div>
+      </div>
     </div>
   )
 }
