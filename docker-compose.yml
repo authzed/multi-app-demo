@@ -1,10 +1,24 @@
 services:
+  postgres:
+    image: postgres:17
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=demo
+      - POSTGRES_PASSWORD=demo123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+
   groups-service:
     build: ./groups-service
     ports:
       - "3001:3001"
     environment:
       - GIN_MODE=release
+      - DATABASE_URL=postgres://demo:demo123@postgres:5432/groups_db
+    depends_on:
+      - postgres
 
   mail-service:
     build: ./mail-service
@@ -12,6 +26,9 @@ services:
       - "3002:3002"
     environment:
       - NODE_ENV=production
+      - DATABASE_URL=postgres://demo:demo123@postgres:5432/mail_db
+    depends_on:
+      - postgres
 
   docs-service:
     build: ./docs-service
@@ -19,6 +36,11 @@ services:
       - "3003:3003"
     environment:
       - SPRING_PROFILES_ACTIVE=production
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/docs_db
+      - SPRING_DATASOURCE_USERNAME=demo
+      - SPRING_DATASOURCE_PASSWORD=demo123
+    depends_on:
+      - postgres
 
   frontend:
     build: ./frontend
@@ -28,3 +50,6 @@ services:
       - groups-service
       - mail-service
       - docs-service
+
+volumes:
+  postgres_data:
