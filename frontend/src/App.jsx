@@ -24,7 +24,7 @@ function App() {
         <Header users={users} currentUser={currentUser} setCurrentUser={setCurrentUser} />
         
         <main className="main-content">
-          <Routes>
+          <Routes key={currentUser.id}>
             <Route path="/groups" element={<GroupsPage currentUser={currentUser} />} />
             <Route path="/groups/:id" element={<GroupDetailPage currentUser={currentUser} />} />
             <Route path="/mail" element={<MailPage currentUser={currentUser} />} />

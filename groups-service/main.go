@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io/ioutil"
@@ -11,8 +12,13 @@ import (
 	"strings"
 	"time"
 
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/authzed-go/v1"
+	"github.com/authzed/grpcutil"
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Group struct {
@@ -33,7 +39,233 @@ type CreateGroupRequest struct {
 	OwnerUsername string `json:"owner_username" binding:"required"`
 }
 
-var db *sql.DB
+var (
+	db            *sql.DB
+	spicedbClient *authzed.Client
+)
+
+func initSpiceDB() {
+	spicedbEndpoint := os.Getenv("SPICEDB_ENDPOINT")
+	if spicedbEndpoint == "" {
+		spicedbEndpoint = "localhost:50051"
+	}
+
+	spicedbToken := os.Getenv("SPICEDB_TOKEN")
+	if spicedbToken == "" {
+		spicedbToken = "testtesttesttest"
+	}
+
+	// Wait for SpiceDB to be ready
+	for i := 0; i < 30; i++ {
+		client, err := authzed.NewClient(spicedbEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpcutil.WithInsecureBearerToken(spicedbToken))
+		if err != nil {
+			log.Printf("Failed to connect to SpiceDB: %v", err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		_, err = client.CheckPermission(context.Background(), &v1.CheckPermissionRequest{
+			Resource: &v1.ObjectReference{
+				ObjectType: "group",
+				ObjectId:   "test",
+			},
+			Permission: "view_members",
+			Subject: &v1.SubjectReference{
+				Object: &v1.ObjectReference{
+					ObjectType: "user",
+					ObjectId:   "test",
+				},
+			},
+		})
+		if err == nil || strings.Contains(err.Error(), "object_not_found") {
+			spicedbClient = client
+			log.Println("SpiceDB connected successfully")
+			break
+		}
+	}
+
+	if spicedbClient == nil {
+		log.Fatal("Failed to connect to SpiceDB")
+	}
+
+	initializeTestData()
+}
+
+func initializeTestData() {
+	log.Println("Initializing SpiceDB test data...")
+
+	// Create some test relationships for existing groups
+	rows, err := db.Query(`
+		SELECT g.id, gm.username, gm.role 
+		FROM groups g 
+		JOIN group_memberships gm ON g.id = gm.group_id
+	`)
+	if err != nil {
+		log.Printf("Failed to fetch existing groups for SpiceDB init: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	var updates []*v1.RelationshipUpdate
+	for rows.Next() {
+		var groupID int
+		var username, role string
+		err := rows.Scan(&groupID, &username, &role)
+		if err != nil {
+			log.Printf("Failed to scan group membership: %v", err)
+			continue
+		}
+
+		var relation string
+		switch role {
+		case "OWNER", "MANAGER":
+			relation = "admin"
+		case "MEMBER":
+			relation = "member"
+		default:
+			continue
+		}
+
+		updates = append(updates, &v1.RelationshipUpdate{
+			Operation: v1.RelationshipUpdate_OPERATION_CREATE,
+			Relationship: &v1.Relationship{
+				Resource: &v1.ObjectReference{
+					ObjectType: "group",
+					ObjectId:   fmt.Sprintf("%d", groupID),
+				},
+				Relation: relation,
+				Subject: &v1.SubjectReference{
+					Object: &v1.ObjectReference{
+						ObjectType: "user",
+						ObjectId:   username,
+					},
+				},
+			},
+		})
+	}
+
+	if len(updates) > 0 {
+		_, err = spicedbClient.WriteRelationships(context.Background(), &v1.WriteRelationshipsRequest{
+			Updates: updates,
+		})
+		if err != nil {
+			log.Printf("Failed to initialize SpiceDB relationships: %v", err)
+		} else {
+			log.Printf("Initialized %d SpiceDB relationships", len(updates))
+		}
+	}
+}
+
+func checkPermission(username string, groupID int, permission string) bool {
+	resp, err := spicedbClient.CheckPermission(context.Background(), &v1.CheckPermissionRequest{
+		Resource: &v1.ObjectReference{
+			ObjectType: "group",
+			ObjectId:   fmt.Sprintf("%d", groupID),
+		},
+		Permission: permission,
+		Subject: &v1.SubjectReference{
+			Object: &v1.ObjectReference{
+				ObjectType: "user",
+				ObjectId:   username,
+			},
+		},
+	})
+	if err != nil {
+		log.Printf("SpiceDB permission check failed: %v", err)
+		return false
+	}
+	return resp.Permissionship == v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION
+}
+
+func addSpiceDBRelationship(groupID int, username string, role string) error {
+	var relation string
+	switch role {
+	case "OWNER", "MANAGER":
+		relation = "admin"
+	case "MEMBER":
+		relation = "member"
+	default:
+		return fmt.Errorf("invalid role: %s", role)
+	}
+
+	_, err := spicedbClient.WriteRelationships(context.Background(), &v1.WriteRelationshipsRequest{
+		Updates: []*v1.RelationshipUpdate{
+			{
+				Operation: v1.RelationshipUpdate_OPERATION_CREATE,
+				Relationship: &v1.Relationship{
+					Resource: &v1.ObjectReference{
+						ObjectType: "group",
+						ObjectId:   fmt.Sprintf("%d", groupID),
+					},
+					Relation: relation,
+					Subject: &v1.SubjectReference{
+						Object: &v1.ObjectReference{
+							ObjectType: "user",
+							ObjectId:   username,
+						},
+					},
+				},
+			},
+		},
+	})
+	return err
+}
+
+func removeSpiceDBRelationship(groupID int, username string) error {
+	// Remove both admin and member relationships
+	updates := []*v1.RelationshipUpdate{
+		{
+			Operation: v1.RelationshipUpdate_OPERATION_DELETE,
+			Relationship: &v1.Relationship{
+				Resource: &v1.ObjectReference{
+					ObjectType: "group",
+					ObjectId:   fmt.Sprintf("%d", groupID),
+				},
+				Relation: "admin",
+				Subject: &v1.SubjectReference{
+					Object: &v1.ObjectReference{
+						ObjectType: "user",
+						ObjectId:   username,
+					},
+				},
+			},
+		},
+		{
+			Operation: v1.RelationshipUpdate_OPERATION_DELETE,
+			Relationship: &v1.Relationship{
+				Resource: &v1.ObjectReference{
+					ObjectType: "group",
+					ObjectId:   fmt.Sprintf("%d", groupID),
+				},
+				Relation: "member",
+				Subject: &v1.SubjectReference{
+					Object: &v1.ObjectReference{
+						ObjectType: "user",
+						ObjectId:   username,
+					},
+				},
+			},
+		},
+	}
+
+	_, err := spicedbClient.WriteRelationships(context.Background(), &v1.WriteRelationshipsRequest{
+		Updates: updates,
+	})
+	return err
+}
+
+func deleteSpiceDBGroup(groupID int) error {
+	// Delete all relationships for this group
+	filter := &v1.RelationshipFilter{
+		ResourceType:       "group",
+		OptionalResourceId: fmt.Sprintf("%d", groupID),
+	}
+
+	_, err := spicedbClient.DeleteRelationships(context.Background(), &v1.DeleteRelationshipsRequest{
+		RelationshipFilter: filter,
+	})
+	return err
+}
 
 func initDB() {
 	var err error
@@ -77,7 +309,7 @@ func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Username")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
@@ -111,7 +343,7 @@ func getGroups(c *gin.Context) {
 			return
 		}
 		group.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
-		
+
 		// Fetch owners for this group
 		owners, err := getGroupOwners(group.ID)
 		if err != nil {
@@ -120,7 +352,7 @@ func getGroups(c *gin.Context) {
 		} else {
 			group.Owners = owners
 		}
-		
+
 		groups = append(groups, group)
 	}
 
@@ -148,7 +380,7 @@ func getGroupOwners(groupID int) ([]string, error) {
 		}
 		owners = append(owners, username)
 	}
-	
+
 	return owners, nil
 }
 
@@ -180,7 +412,6 @@ func createGroup(c *gin.Context) {
 		VALUES ($1, $2, $3, $4) 
 		RETURNING id
 	`, req.Name, req.Description, email, req.Visibility).Scan(&groupID)
-
 	if err != nil {
 		log.Printf("Failed to create group: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create group"})
@@ -192,11 +423,16 @@ func createGroup(c *gin.Context) {
 		INSERT INTO group_memberships (group_id, username, role) 
 		VALUES ($1, $2, 'OWNER')
 	`, groupID, req.OwnerUsername)
-
 	if err != nil {
 		log.Printf("Failed to add creator as owner: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add creator as owner"})
 		return
+	}
+
+	// Add relationship to SpiceDB
+	err = addSpiceDBRelationship(groupID, req.OwnerUsername, "OWNER")
+	if err != nil {
+		log.Printf("Failed to add SpiceDB relationship for group %d: %v", groupID, err)
 	}
 
 	// Fetch the created group
@@ -209,14 +445,13 @@ func createGroup(c *gin.Context) {
 		&group.ID, &group.Name, &group.Description, &group.Email,
 		&group.Visibility, &createdAt,
 	)
-
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch created group"})
 		return
 	}
 
 	group.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
-	
+
 	// Fetch owners for the created group
 	owners, err := getGroupOwners(groupID)
 	if err != nil {
@@ -225,16 +460,22 @@ func createGroup(c *gin.Context) {
 	} else {
 		group.Owners = owners
 	}
-	
+
 	c.JSON(http.StatusCreated, group)
 }
-
 
 func getGroupMembers(c *gin.Context) {
 	groupIDStr := c.Param("id")
 	groupID, err := strconv.Atoi(groupIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid group ID"})
+		return
+	}
+
+	// Check permission to view members
+	username := c.GetHeader("X-Username")
+	if username == "" || !checkPermission(username, groupID, "view_members") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied"})
 		return
 	}
 
@@ -277,6 +518,13 @@ func addGroupMember(c *gin.Context) {
 		return
 	}
 
+	// Check permission to add members
+	username := c.GetHeader("X-Username")
+	if username == "" || !checkPermission(username, groupID, "add_member") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied"})
+		return
+	}
+
 	type AddMemberRequest struct {
 		Username string `json:"username" binding:"required"`
 		Role     string `json:"role" binding:"required"`
@@ -314,11 +562,16 @@ func addGroupMember(c *gin.Context) {
 		ON CONFLICT (group_id, username) 
 		DO UPDATE SET role = EXCLUDED.role
 	`, groupID, req.Username, req.Role)
-
 	if err != nil {
 		log.Printf("Failed to add member to group %d: %v", groupID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add member to group"})
 		return
+	}
+
+	// Add relationship to SpiceDB
+	err = addSpiceDBRelationship(groupID, req.Username, req.Role)
+	if err != nil {
+		log.Printf("Failed to add SpiceDB relationship for user %s in group %d: %v", req.Username, groupID, err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Member added successfully"})
@@ -326,11 +579,18 @@ func addGroupMember(c *gin.Context) {
 
 func removeGroupMember(c *gin.Context) {
 	groupIDStr := c.Param("id")
-	username := c.Param("username")
-	
+	memberUsername := c.Param("username")
+
 	groupID, err := strconv.Atoi(groupIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid group ID"})
+		return
+	}
+
+	// Check permission to add members (same permission for removing)
+	requesterUsername := c.GetHeader("X-Username")
+	if requesterUsername == "" || !checkPermission(requesterUsername, groupID, "add_member") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied"})
 		return
 	}
 
@@ -338,8 +598,7 @@ func removeGroupMember(c *gin.Context) {
 	result, err := db.Exec(`
 		DELETE FROM group_memberships 
 		WHERE group_id = $1 AND username = $2
-	`, groupID, username)
-
+	`, groupID, memberUsername)
 	if err != nil {
 		log.Printf("Failed to remove member from group %d: %v", groupID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove member from group"})
@@ -357,6 +616,12 @@ func removeGroupMember(c *gin.Context) {
 		return
 	}
 
+	// Remove relationship from SpiceDB
+	err = removeSpiceDBRelationship(groupID, memberUsername)
+	if err != nil {
+		log.Printf("Failed to remove SpiceDB relationship for user %s in group %d: %v", memberUsername, groupID, err)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Member removed successfully"})
 }
 
@@ -365,6 +630,13 @@ func deleteGroup(c *gin.Context) {
 	groupID, err := strconv.Atoi(groupIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid group ID"})
+		return
+	}
+
+	// Check permission to delete group
+	username := c.GetHeader("X-Username")
+	if username == "" || !checkPermission(username, groupID, "delete") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied"})
 		return
 	}
 
@@ -389,6 +661,12 @@ func deleteGroup(c *gin.Context) {
 		return
 	}
 
+	// Clean up SpiceDB relationships
+	err = deleteSpiceDBGroup(groupID)
+	if err != nil {
+		log.Printf("Failed to clean up SpiceDB relationships for group %d: %v", groupID, err)
+	}
+
 	log.Printf("Group %d deleted successfully", groupID)
 	c.JSON(http.StatusOK, gin.H{"message": "Group deleted successfully"})
 }
@@ -396,6 +674,7 @@ func deleteGroup(c *gin.Context) {
 func main() {
 	initDB()
 	defer db.Close()
+	initSpiceDB()
 
 	r := gin.Default()
 	r.Use(corsMiddleware())

@@ -12,6 +12,7 @@ function GroupDetailPage({ currentUser }) {
   const [newMemberRole, setNewMemberRole] = useState('MEMBER')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [permissionDenied, setPermissionDenied] = useState(false)
 
   useEffect(() => {
     fetchGroupDetails()
@@ -39,9 +40,23 @@ function GroupDetailPage({ currentUser }) {
 
   const fetchGroupMembers = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/groups/${id}/members`)
-      const data = await response.json()
-      setMembers(data)
+      const response = await fetch(`http://localhost:3001/groups/${id}/members`, {
+        headers: {
+          'X-Username': currentUser.username
+        }
+      })
+      
+      if (response.status === 403) {
+        setPermissionDenied(true)
+        return
+      }
+      
+      if (response.ok) {
+        const data = await response.json()
+        setMembers(data)
+      } else {
+        console.error('Error fetching group members:', response.statusText)
+      }
     } catch (error) {
       console.error('Error fetching group members:', error)
     }
@@ -53,7 +68,10 @@ function GroupDetailPage({ currentUser }) {
     try {
       const response = await fetch(`http://localhost:3001/groups/${id}/members`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Username': currentUser.username
+        },
         body: JSON.stringify({
           username: newMemberUsername,
           role: newMemberRole
@@ -86,7 +104,10 @@ function GroupDetailPage({ currentUser }) {
 
     try {
       const response = await fetch(`http://localhost:3001/groups/${id}/members/${username}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'X-Username': currentUser.username
+        }
       })
 
       if (response.ok) {
@@ -109,7 +130,10 @@ function GroupDetailPage({ currentUser }) {
 
     try {
       const response = await fetch(`http://localhost:3001/groups/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'X-Username': currentUser.username
+        }
       })
 
       if (response.ok) {
@@ -190,63 +214,79 @@ function GroupDetailPage({ currentUser }) {
         </div>
 
         {/* Add Member Section */}
-        <div className="full-width-section">
-          <WiredCard className="form-section">
-            <h3>Add Member</h3>
-            <div className="form-row">
-              <WiredInput 
-                className="form-input"
-                placeholder="Username"
-                value={newMemberUsername}
-                onChange={(e) => setNewMemberUsername(e.target.value)}
-              />
-              <WiredCombo
-                selected={newMemberRole}
-                onselected={(e) => {setNewMemberRole(e.detail.selected)}}
-              >
-                <WiredItem value="MEMBER" >Member</WiredItem>
-                <WiredItem value="MANAGER" >Manager</WiredItem>
-                <WiredItem value="OWNER" >Owner</WiredItem>
-              </WiredCombo>
-              <WiredButton onClick={addMember}>Add Member</WiredButton>
-            </div>
-          </WiredCard>
-        </div>
+        {!permissionDenied && (
+          <div className="full-width-section">
+            <WiredCard className="form-section">
+              <h3>Add Member</h3>
+              <div className="form-row">
+                <WiredInput 
+                  className="form-input"
+                  placeholder="Username"
+                  value={newMemberUsername}
+                  onChange={(e) => setNewMemberUsername(e.target.value)}
+                />
+                <WiredCombo
+                  selected={newMemberRole}
+                  onselected={(e) => {setNewMemberRole(e.detail.selected)}}
+                >
+                  <WiredItem value="MEMBER" >Member</WiredItem>
+                  <WiredItem value="MANAGER" >Manager</WiredItem>
+                  <WiredItem value="OWNER" >Owner</WiredItem>
+                </WiredCombo>
+                <WiredButton onClick={addMember}>Add Member</WiredButton>
+              </div>
+            </WiredCard>
+          </div>
+        )}
 
         {/* Members List Section */}
         <div className="full-width-section">
           <WiredCard className="content-section">
-            <h3>Members ({members.length})</h3>
-            <div className="items-grid">
-              {members.map(member => (
-                <WiredCard key={member.username} className="item-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div><strong>{member.username}</strong></div>
-                      <div style={{ color: '#666', fontSize: '14px' }}>
-                        Role: {member.role}
-                      </div>
-                    </div>
-                    <WiredButton 
-                      onClick={() => removeMember(member.username)}
-                      style={{ 
-                        fontSize: '12px', 
-                        padding: '4px 8px',
-                        background: '#ff4444',
-                        color: 'white'
-                      }}
-                    >
-                      Remove
-                    </WiredButton>
-                  </div>
-                </WiredCard>
-              ))}
-              {members.length === 0 && (
-                <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
-                  No members in this group yet.
+            <h3>Members {!permissionDenied && `(${members.length})`}</h3>
+            {permissionDenied ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <p style={{ color: '#ff4444', fontSize: '16px', marginBottom: '15px' }}>
+                  <strong>Permission Denied</strong>
                 </p>
-              )}
-            </div>
+                <p style={{ color: '#666', marginBottom: '20px' }}>
+                  You don't have permission to view the members of this group.
+                </p>
+                <WiredButton onClick={() => navigate('/groups')}>
+                  Return to Groups Listing
+                </WiredButton>
+              </div>
+            ) : (
+              <div className="items-grid">
+                {members.map(member => (
+                  <WiredCard key={member.username} className="item-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div><strong>{member.username}</strong></div>
+                        <div style={{ color: '#666', fontSize: '14px' }}>
+                          Role: {member.role}
+                        </div>
+                      </div>
+                      <WiredButton 
+                        onClick={() => removeMember(member.username)}
+                        style={{ 
+                          fontSize: '12px', 
+                          padding: '4px 8px',
+                          background: '#ff4444',
+                          color: 'white'
+                        }}
+                      >
+                        Remove
+                      </WiredButton>
+                    </div>
+                  </WiredCard>
+                ))}
+                {members.length === 0 && (
+                  <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
+                    No members in this group yet.
+                  </p>
+                )}
+              </div>
+            )}
           </WiredCard>
         </div>
       </div>

@@ -36,7 +36,10 @@ function GroupsPage({ currentUser }) {
     try {
       const response = await fetch('http://localhost:3001/groups', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Username': currentUser.username 
+        },
         body: JSON.stringify({ 
           name: newGroup.name,
           description: newGroup.description || `A group for ${newGroup.name} discussions`,

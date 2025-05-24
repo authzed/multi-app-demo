@@ -1,0 +1,12 @@
+definition user {}
+
+definition group {
+    // Relations define who can have what relationships with groups
+    relation admin: user
+    relation member: user
+    
+    // Permissions define what actions can be performed
+    permission delete = admin
+    permission add_member = admin  
+    permission view_members = admin + member
+}

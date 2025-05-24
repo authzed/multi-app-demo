@@ -33,12 +33,30 @@ services:
       - "9090:9090"
       - "50051:50051"
     environment:
-      - SPICEDB_GRPC_PRESHARED_KEY=somerandomkeyhere
+      - SPICEDB_GRPC_PRESHARED_KEY=testtesttesttest
       - SPICEDB_DATASTORE_ENGINE=postgres
       - SPICEDB_DATASTORE_CONN_URI=postgres://demo:demo123@postgres:5432/spicedb?sslmode=disable
     depends_on:
       - postgres
       - spicedb-migrate
+    healthcheck:
+      test: ["CMD", "sh", "-c", "spicedb health --grpc-addr=localhost:50051 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  spicedb-schema:
+    image: authzed/zed:latest
+    command: >
+      sh -c "
+        zed schema write --endpoint=spicedb:50051 --token=testtesttesttest /schema/spicedb-schema.yaml &&
+        echo 'Schema applied successfully!'
+      "
+    volumes:
+      - ./spicedb-schema.yaml:/schema/spicedb-schema.yaml:ro
+    depends_on:
+      spicedb:
+        condition: service_healthy
 
   groups-service:
     build: ./groups-service
@@ -48,7 +66,7 @@ services:
       - GIN_MODE=release
       - DATABASE_URL=postgres://demo:demo123@postgres:5432/groups_db
       - SPICEDB_ENDPOINT=spicedb:50051
-      - SPICEDB_TOKEN=somerandomkeyhere
+      - SPICEDB_TOKEN=testtesttesttest
     depends_on:
       - postgres
       - spicedb
@@ -61,7 +79,7 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=postgres://demo:demo123@postgres:5432/mail_db
       - SPICEDB_ENDPOINT=spicedb:50051
-      - SPICEDB_TOKEN=somerandomkeyhere
+      - SPICEDB_TOKEN=testtesttesttest
     depends_on:
       - postgres
       - spicedb
@@ -76,7 +94,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=demo
       - SPRING_DATASOURCE_PASSWORD=demo123
       - SPICEDB_ENDPOINT=spicedb:50051
-      - SPICEDB_TOKEN=somerandomkeyhere
+      - SPICEDB_TOKEN=testtesttesttest
     depends_on:
       - postgres
       - spicedb
