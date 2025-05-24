@@ -4,16 +4,19 @@ import './PageLayout.css'
 
 function DocsPage({ currentUser }) {
   const [documents, setDocuments] = useState([])
-  const [newDoc, setNewDoc] = useState({ title: '', content: '', owner: '' })
+  const [newDoc, setNewDoc] = useState({ title: '', content: '' })
 
   useEffect(() => {
     fetchDocuments()
-    setNewDoc({ ...newDoc, owner: currentUser.name })
   }, [currentUser])
 
   const fetchDocuments = async () => {
     try {
-      const response = await fetch('http://localhost:3003/documents')
+      const response = await fetch('http://localhost:3003/documents', {
+        headers: {
+          'X-Username': currentUser.username
+        }
+      })
       const data = await response.json()
       setDocuments(data)
     } catch (error) {
@@ -22,17 +25,23 @@ function DocsPage({ currentUser }) {
   }
 
   const createDocument = async () => {
-    if (!newDoc.title.trim() || !newDoc.owner.trim()) return
+    if (!newDoc.title.trim()) return
 
     try {
       const response = await fetch('http://localhost:3003/documents', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newDoc)
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Username': currentUser.username
+        },
+        body: JSON.stringify({
+          title: newDoc.title,
+          content: newDoc.content
+        })
       })
       const createdDoc = await response.json()
       setDocuments([...documents, createdDoc])
-      setNewDoc({ title: '', content: '', owner: currentUser.name })
+      setNewDoc({ title: '', content: '' })
     } catch (error) {
       console.error('Error creating document:', error)
     }
@@ -53,14 +62,6 @@ function DocsPage({ currentUser }) {
               placeholder="Document title"
               value={newDoc.title}
               onChange={(e) => setNewDoc({...newDoc, title: e.target.value})}
-            />
-          </div>
-          <div className="form-row">
-            <WiredInput 
-              className="form-input"
-              placeholder="Owner"
-              value={newDoc.owner}
-              onChange={(e) => setNewDoc({...newDoc, owner: e.target.value})}
             />
           </div>
           <div className="form-row">
@@ -85,6 +86,9 @@ function DocsPage({ currentUser }) {
                 <WiredCard key={doc.id} className="item-card">
                   <div><strong>Title:</strong> {doc.title}</div>
                   <div><strong>Owner:</strong> {doc.owner}</div>
+                  <div style={{ color: '#888', fontSize: '12px', marginTop: '5px' }}>
+                    Created: {new Date(doc.createdAt).toLocaleDateString()}
+                  </div>
                   <div style={{ marginTop: '10px', color: '#555', fontSize: '14px' }}>
                     {doc.content ? doc.content.substring(0, 150) + (doc.content.length > 150 ? '...' : '') : 'No content'}
                   </div>
