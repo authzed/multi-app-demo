@@ -290,115 +290,146 @@ function FolderDetailPage({ currentUser }) {
           </div>
         )}
 
-        {/* Folders Section */}
-        {subFolders.length > 0 && (
-          <div className="full-width-section">
-            <WiredCard className="content-section">
-              <h3>📁 Folders ({subFolders.length})</h3>
-              <div className="items-grid">
-                {subFolders.map(folder => (
-                  <WiredCard 
-                    key={folder.id} 
-                    className="item-card"
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => navigate(`/docs/folder/${folder.id}`)}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '20px' }}>📁</span>
-                          <strong>{folder.name}</strong>
-                        </div>
-                        <div style={{ color: '#666', fontSize: '12px', marginTop: '5px' }}>
-                          Owner: {folder.owner}
-                        </div>
-                        <div style={{ color: '#888', fontSize: '12px' }}>
-                          Created: {new Date(folder.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                      {folder.owner === currentUser.username && (
-                        <WiredButton 
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            deleteFolder(folder.id, folder.name)
-                          }}
-                          style={{ 
-                            fontSize: '12px', 
-                            padding: '4px 8px',
-                            backgroundColor: '#e74c3c',
-                            color: 'white'
-                          }}
-                        >
-                          Delete
-                        </WiredButton>
-                      )}
-                    </div>
-                    <div style={{ 
-                      marginTop: '10px', 
-                      padding: '5px 0', 
-                      borderTop: '1px solid #eee', 
-                      fontSize: '12px', 
-                      color: '#007bff' 
-                    }}>
-                      Click to open →
-                    </div>
-                  </WiredCard>
-                ))}
-              </div>
-            </WiredCard>
-          </div>
-        )}
-
-        {/* Documents Section */}
+        {/* Unified Files and Folders Table */}
         <div className="full-width-section">
           <WiredCard className="content-section">
-            <h3>📄 Documents ({documents.length})</h3>
-            <div className="items-grid">
-              {documents.map(doc => (
-                <WiredCard key={doc.id} className="item-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '16px' }}>📄</span>
-                        <strong>{doc.title}</strong>
-                      </div>
-                      <div style={{ color: '#666', fontSize: '12px', marginTop: '5px' }}>
-                        Owner: {doc.owner}
-                      </div>
-                      <div style={{ color: '#888', fontSize: '12px' }}>
-                        Created: {new Date(doc.createdAt).toLocaleDateString()}
-                      </div>
-                      <div style={{ marginTop: '10px', color: '#555', fontSize: '14px' }}>
-                        {doc.content ? doc.content.substring(0, 100) + (doc.content.length > 100 ? '...' : '') : 'No content'}
-                      </div>
-                    </div>
-                    {doc.owner === currentUser.username && (
-                      <WiredButton 
-                        onClick={() => deleteDocument(doc.id, doc.title)}
+            <h3>📂 Contents ({subFolders.length + documents.length})</h3>
+            {(subFolders.length > 0 || documents.length > 0) ? (
+              <div style={{ overflowX: 'auto' }}>
+                <style>
+                  {`
+                    .folder-table tr:hover {
+                      background-color: #4a4a4a !important;
+                    }
+                  `}
+                </style>
+                <table className="folder-table" style={{ 
+                  width: '100%', 
+                  borderCollapse: 'collapse',
+                  marginTop: '15px'
+                }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #333' }}>
+                      <th style={{ 
+                        textAlign: 'left', 
+                        padding: '12px 8px', 
+                        fontWeight: 'bold',
+                        width: '50%'
+                      }}>
+                        Name
+                      </th>
+                      <th style={{ 
+                        textAlign: 'left', 
+                        padding: '12px 8px', 
+                        fontWeight: 'bold',
+                        width: '25%'
+                      }}>
+                        Owner
+                      </th>
+                      <th style={{ 
+                        textAlign: 'left', 
+                        padding: '12px 8px', 
+                        fontWeight: 'bold',
+                        width: '20%'
+                      }}>
+                        Created
+                      </th>
+                      <th style={{ 
+                        textAlign: 'center', 
+                        padding: '12px 8px', 
+                        fontWeight: 'bold',
+                        width: '5%'
+                      }}>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Folders first */}
+                    {subFolders.map(folder => (
+                      <tr 
+                        key={`folder-${folder.id}`}
                         style={{ 
-                          fontSize: '12px', 
-                          padding: '4px 8px',
-                          backgroundColor: '#e74c3c',
-                          color: 'white'
+                          borderBottom: '1px solid #eee',
+                          cursor: 'pointer'
                         }}
+                        onClick={() => navigate(`/docs/folder/${folder.id}`)}
                       >
-                        Delete
-                      </WiredButton>
-                    )}
-                  </div>
-                </WiredCard>
-              ))}
-              {documents.length === 0 && subFolders.length === 0 && (
-                <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
-                  This folder is empty. Create your first document or folder above!
-                </p>
-              )}
-              {documents.length === 0 && subFolders.length > 0 && (
-                <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
-                  No documents in this folder yet. Create a new document above!
-                </p>
-              )}
-            </div>
+                        <td style={{ padding: '12px 8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '18px' }}>📁</span>
+                            <strong style={{ color: '#007bff' }}>{folder.name}</strong>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 8px', color: '#666' }}>
+                          {folder.owner}
+                        </td>
+                        <td style={{ padding: '12px 8px', color: '#888', fontSize: '14px' }}>
+                          {new Date(folder.createdAt).toLocaleDateString()}
+                        </td>
+                        <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                          {folder.owner === currentUser.username && (
+                            <WiredButton 
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                deleteFolder(folder.id, folder.name)
+                              }}
+                              style={{ 
+                                fontSize: '11px', 
+                                padding: '4px 8px',
+                                backgroundColor: '#e74c3c',
+                                color: 'white'
+                              }}
+                            >
+                              Delete
+                            </WiredButton>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Documents after folders */}
+                    {documents.map(doc => (
+                      <tr 
+                        key={`doc-${doc.id}`}
+                        style={{ borderBottom: '1px solid #eee' }}
+                      >
+                        <td style={{ padding: '12px 8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '16px' }}>📄</span>
+                            <span>{doc.title}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 8px', color: '#666' }}>
+                          {doc.owner}
+                        </td>
+                        <td style={{ padding: '12px 8px', color: '#888', fontSize: '14px' }}>
+                          {new Date(doc.createdAt).toLocaleDateString()}
+                        </td>
+                        <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                          {doc.owner === currentUser.username && (
+                            <WiredButton 
+                              onClick={() => deleteDocument(doc.id, doc.title)}
+                              style={{ 
+                                fontSize: '11px', 
+                                padding: '4px 8px',
+                                backgroundColor: '#e74c3c',
+                                color: 'white'
+                              }}
+                            >
+                              Delete
+                            </WiredButton>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p style={{ color: '#666', textAlign: 'center', padding: '40px 20px' }}>
+                This folder is empty. Create your first document or folder above!
+              </p>
+            )}
           </WiredCard>
         </div>
       </div>
