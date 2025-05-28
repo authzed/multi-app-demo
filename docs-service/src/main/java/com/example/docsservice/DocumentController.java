@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @CrossOrigin(origins = "*")
@@ -27,7 +28,7 @@ public class DocumentController {
 
     // Folder endpoints
     @GetMapping("/folders/{folderId}")
-    public ResponseEntity<Map<String, Object>> getFolderContents(@PathVariable Long folderId,
+    public ResponseEntity<Map<String, Object>> getFolderContents(@PathVariable UUID folderId,
                                                                @RequestHeader(value = "X-Username", required = false) String username) {
         if (username == null || username.isEmpty()) {
             return ResponseEntity.badRequest().build();
@@ -76,8 +77,8 @@ public class DocumentController {
         }
 
         String name = (String) request.get("name");
-        Long parentFolderId = request.get("parentFolderId") != null ? 
-            Long.valueOf(request.get("parentFolderId").toString()) : null;
+        UUID parentFolderId = request.get("parentFolderId") != null ? 
+            UUID.fromString(request.get("parentFolderId").toString()) : null;
 
         if (name == null || name.trim().isEmpty()) {
             return ResponseEntity.badRequest().build();
@@ -108,8 +109,8 @@ public class DocumentController {
 
         String title = (String) request.get("title");
         String content = (String) request.get("content");
-        Long folderId = request.get("folderId") != null ? 
-            Long.valueOf(request.get("folderId").toString()) : null;
+        UUID folderId = request.get("folderId") != null ? 
+            UUID.fromString(request.get("folderId").toString()) : null;
 
         if (title == null || title.trim().isEmpty()) {
             return ResponseEntity.badRequest().build();
@@ -131,7 +132,7 @@ public class DocumentController {
     }
 
     @GetMapping("/documents/{id}")
-    public ResponseEntity<Document> getDocument(@PathVariable Long id,
+    public ResponseEntity<Document> getDocument(@PathVariable UUID id,
                                               @RequestHeader(value = "X-Username", required = false) String username) {
         if (username == null || username.isEmpty()) {
             return ResponseEntity.badRequest().build();
@@ -145,7 +146,7 @@ public class DocumentController {
     }
 
     @PutMapping("/documents/{id}")
-    public ResponseEntity<Document> updateDocument(@PathVariable Long id,
+    public ResponseEntity<Document> updateDocument(@PathVariable UUID id,
                                                  @RequestBody Document updatedDocument,
                                                  @RequestHeader(value = "X-Username", required = false) String username) {
         if (username == null || username.isEmpty()) {
@@ -163,7 +164,7 @@ public class DocumentController {
     }
 
     @DeleteMapping("/documents/{id}")
-    public ResponseEntity<Void> deleteDocument(@PathVariable Long id,
+    public ResponseEntity<Void> deleteDocument(@PathVariable UUID id,
                                              @RequestHeader(value = "X-Username", required = false) String username) {
         if (username == null || username.isEmpty()) {
             return ResponseEntity.badRequest().build();
@@ -178,7 +179,7 @@ public class DocumentController {
     }
 
     @DeleteMapping("/folders/{id}")
-    public ResponseEntity<Void> deleteFolder(@PathVariable Long id,
+    public ResponseEntity<Void> deleteFolder(@PathVariable UUID id,
                                            @RequestHeader(value = "X-Username", required = false) String username) {
         if (username == null || username.isEmpty()) {
             return ResponseEntity.badRequest().build();
