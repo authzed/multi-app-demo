@@ -386,9 +386,29 @@ public class DocumentController {
                 return ResponseEntity.status(403).build();
             }
 
-            Optional<Document> document = documentRepository.findByIdWithFolder(id);
-            if (document.isPresent()) {
-                return ResponseEntity.ok(document.get());
+            Optional<Document> documentOpt = documentRepository.findByIdWithFolder(id);
+            if (documentOpt.isPresent()) {
+                Document document = documentOpt.get();
+                
+                // Read owner relationships from SpiceDB
+                ReadRelationshipsRequest readRequest = ReadRelationshipsRequest.newBuilder()
+                        .setRelationshipFilter(RelationshipFilter.newBuilder()
+                                .setResourceType("document")
+                                .setOptionalResourceId(id.toString())
+                                .setOptionalRelation("owner")
+                                .build())
+                        .build();
+
+                List<String> owners = new ArrayList<>();
+                permClient.readRelationships(readRequest).forEachRemaining(response -> {
+                    Relationship rel = response.getRelationship();
+                    if ("owner".equals(rel.getRelation())) {
+                        owners.add(rel.getSubject().getObject().getObjectId());
+                    }
+                });
+                
+                document.setOwners(owners);
+                return ResponseEntity.ok(document);
             }
             return ResponseEntity.notFound().build();
         } catch (Exception e) {

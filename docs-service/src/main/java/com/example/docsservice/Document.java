@@ -35,6 +35,9 @@ public class Document {
     
     @Column(name = "zedtoken")
     private String zedtoken;
+    
+    @Transient
+    private List<String> owners = new ArrayList<>();
 
     public Document() {
         this.createdAt = LocalDateTime.now();
@@ -74,4 +77,7 @@ public class Document {
 
     public String getZedtoken() { return zedtoken; }
     public void setZedtoken(String zedtoken) { this.zedtoken = zedtoken; }
+
+    public List<String> getOwners() { return owners; }
+    public void setOwners(List<String> owners) { this.owners = owners; }
 }

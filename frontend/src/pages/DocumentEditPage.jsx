@@ -173,7 +173,7 @@ function DocumentEditPage({ currentUser }) {
           <div>
             <h2>📄 Edit Document</h2>
             <p style={{ color: '#666', margin: '5px 0' }}>
-              Owner: {document.owner}
+              Owner: {document.owners && document.owners.length > 0 ? document.owners.join(', ') : 'No owners'}
             </p>
             <p style={{ color: '#888', margin: '5px 0', fontSize: '14px' }}>
               Created: {new Date(document.createdAt).toLocaleDateString()}
@@ -205,7 +205,7 @@ function DocumentEditPage({ currentUser }) {
             >
               Share
             </WiredButton>
-            {document.owner === currentUser.username && (
+            {document.owners && document.owners.includes(currentUser.username) && (
               <WiredButton 
                 onClick={deleteDocument}
                 style={{ 
