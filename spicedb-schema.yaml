@@ -10,3 +10,36 @@ definition group {
     permission add_member = admin  
     permission view_members = admin + member
 }
+
+definition folder {
+    // Direct relations for folder sharing
+    relation owner: user
+    relation editor: user | user:*
+    relation viewer: user | user:*
+    
+    // Parent folder relation for inheritance
+    relation parent: folder
+    
+    // Permissions with inheritance from parent folders
+    permission view = viewer + editor + owner + parent->view
+    permission create_content = editor + owner + parent->create_content
+    permission delete_content = editor + owner + parent->delete_content
+    permission delete = owner + parent->delete
+    permission manage_sharing = owner + parent->manage_sharing
+}
+
+definition document {
+    // Direct relations for document sharing
+    relation reader: user | user:*
+    relation editor: user | user:*
+    relation owner: user
+    
+    // Parent folder relation for inheritance
+    relation folder: folder
+    
+    // Permissions with inheritance from parent folder
+    permission view = reader + editor + owner + folder->view
+    permission edit = editor + owner + folder->create_content
+    permission delete = owner + folder->delete_content
+    permission manage_sharing = owner + folder->manage_sharing
+}
