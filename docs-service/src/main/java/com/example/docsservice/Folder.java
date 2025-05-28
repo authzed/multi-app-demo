@@ -28,7 +28,7 @@ public class Folder {
     private List<Folder> subFolders = new ArrayList<>();
     
     @OneToMany(mappedBy = "folder", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonManagedReference("folder-documents")
+    @JsonBackReference("document-folder")
     private List<Document> documents = new ArrayList<>();
     
     @Column(name = "created_at", nullable = false)

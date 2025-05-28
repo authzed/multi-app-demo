@@ -386,7 +386,7 @@ public class DocumentController {
                 return ResponseEntity.status(403).build();
             }
 
-            Optional<Document> document = documentRepository.findById(id);
+            Optional<Document> document = documentRepository.findByIdWithFolder(id);
             if (document.isPresent()) {
                 return ResponseEntity.ok(document.get());
             }
@@ -428,7 +428,7 @@ public class DocumentController {
                 return ResponseEntity.status(403).build();
             }
 
-            Optional<Document> existingDocument = documentRepository.findById(id);
+            Optional<Document> existingDocument = documentRepository.findByIdWithFolder(id);
             if (existingDocument.isPresent()) {
                 Document document = existingDocument.get();
                 document.setTitle(updatedDocument.getTitle());
@@ -472,7 +472,7 @@ public class DocumentController {
                 return ResponseEntity.status(403).build();
             }
 
-            Optional<Document> document = documentRepository.findById(id);
+            Optional<Document> document = documentRepository.findByIdWithFolder(id);
             if (document.isPresent()) {
                 documentRepository.deleteById(id);
                 

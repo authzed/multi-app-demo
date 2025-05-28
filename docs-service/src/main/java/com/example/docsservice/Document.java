@@ -2,6 +2,7 @@ package com.example.docsservice;
 
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +24,7 @@ public class Document {
     
     @ManyToOne
     @JoinColumn(name = "folder_id")
-    @JsonBackReference("folder-documents")
+    @JsonManagedReference("document-folder")
     private Folder folder;
     
     @Column(name = "created_at", nullable = false)

@@ -12,4 +12,7 @@ import java.util.UUID;
 public interface DocumentRepository extends JpaRepository<Document, UUID> {
     List<Document> findByTitleContainingIgnoreCase(String title);
     List<Document> findByFolderId(UUID folderId);
+    
+    @Query("SELECT d FROM Document d LEFT JOIN FETCH d.folder WHERE d.id = :id")
+    Optional<Document> findByIdWithFolder(@Param("id") UUID id);
 }

@@ -103,8 +103,12 @@ function DocumentEditPage({ currentUser }) {
 
       if (response.ok) {
         // Navigate back to the folder containing this document
-        if (document.folder && document.folder.id) {
-          navigate(`/docs/folder/${document.folder.id}`)
+        if (document.folder) {
+          if (document.folder.id && !document.folder.isRoot) {
+            navigate(`/docs/folder/${document.folder.id}`)
+          } else {
+            navigate('/docs')
+          }
         } else {
           navigate('/docs')
         }
@@ -118,9 +122,15 @@ function DocumentEditPage({ currentUser }) {
   }
 
   const goBackToFolder = () => {
-    if (document && document.folder && document.folder.id) {
-      navigate(`/docs/folder/${document.folder.id}`)
+    if (document && document.folder) {
+      if (document.folder.id && !document.folder.isRoot) {
+        navigate(`/docs/folder/${document.folder.id}`)
+      } else {
+        // Navigate to root folder view
+        navigate('/docs')
+      }
     } else {
+      // No folder information, go to root
       navigate('/docs')
     }
   }
