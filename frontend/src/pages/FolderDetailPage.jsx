@@ -182,6 +182,7 @@ function FolderDetailPage({ currentUser }) {
   const currentFolder = folderData?.folder
   const subFolders = folderData?.subFolders || []
   const documents = folderData?.documents || []
+  const parentFolderId = folderData?.parentFolderId
 
   return (
     <div className="page-container">
@@ -198,8 +199,8 @@ function FolderDetailPage({ currentUser }) {
           <div style={{ display: 'flex', gap: '10px' }}>
             {currentFolder && !currentFolder.isRoot && (
               <WiredButton onClick={() => {
-                if (currentFolder.parentFolder) {
-                  navigate(`/docs/folder/${currentFolder.parentFolder.id}`)
+                if (parentFolderId) {
+                  navigate(`/docs/folder/${parentFolderId}`)
                 } else {
                   navigate('/docs')
                 }
@@ -314,7 +315,7 @@ function FolderDetailPage({ currentUser }) {
                         textAlign: 'left', 
                         padding: '12px 8px', 
                         fontWeight: 'bold',
-                        width: '50%'
+                        width: '40%'
                       }}>
                         Name
                       </th>
@@ -322,7 +323,15 @@ function FolderDetailPage({ currentUser }) {
                         textAlign: 'left', 
                         padding: '12px 8px', 
                         fontWeight: 'bold',
-                        width: '25%'
+                        width: '15%'
+                      }}>
+                        Type
+                      </th>
+                      <th style={{ 
+                        textAlign: 'left', 
+                        padding: '12px 8px', 
+                        fontWeight: 'bold',
+                        width: '20%'
                       }}>
                         Owner
                       </th>
@@ -362,6 +371,9 @@ function FolderDetailPage({ currentUser }) {
                           </div>
                         </td>
                         <td style={{ padding: '12px 8px', color: '#666' }}>
+                          Folder
+                        </td>
+                        <td style={{ padding: '12px 8px', color: '#666' }}>
                           {folder.owner}
                         </td>
                         <td style={{ padding: '12px 8px', color: '#888', fontSize: '14px' }}>
@@ -398,6 +410,9 @@ function FolderDetailPage({ currentUser }) {
                             <span style={{ fontSize: '16px' }}>📄</span>
                             <span>{doc.title}</span>
                           </div>
+                        </td>
+                        <td style={{ padding: '12px 8px', color: '#666' }}>
+                          Document
                         </td>
                         <td style={{ padding: '12px 8px', color: '#666' }}>
                           {doc.owner}

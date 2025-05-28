@@ -42,11 +42,11 @@ public class DocumentController {
         List<Folder> subFolders = folderRepository.findByParentFolderIdAndViewer(folderId, username);
         List<Document> documents = documentRepository.findByFolderIdAndViewer(folderId, username);
 
-        Map<String, Object> response = Map.of(
-            "folder", folder,
-            "subFolders", subFolders,
-            "documents", documents
-        );
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("folder", folder);
+        response.put("subFolders", subFolders);
+        response.put("documents", documents);
+        response.put("parentFolderId", folder.getParentFolder() != null ? folder.getParentFolder().getId() : null);
 
         return ResponseEntity.ok(response);
     }
