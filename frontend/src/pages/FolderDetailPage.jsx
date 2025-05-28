@@ -392,7 +392,7 @@ function FolderDetailPage({ currentUser }) {
                               }}
                               style={{ 
                                 fontSize: '11px', 
-                                padding: '4px 8px',
+                                padding: '2px 4px',
                                 backgroundColor: '#3498db',
                                 color: 'white'
                               }}
@@ -406,7 +406,7 @@ function FolderDetailPage({ currentUser }) {
                               }}
                               style={{ 
                                 fontSize: '11px', 
-                                padding: '4px 8px',
+                                padding: '2px 4px',
                                 backgroundColor: '#e74c3c',
                                 color: 'white'
                               }}
@@ -450,7 +450,7 @@ function FolderDetailPage({ currentUser }) {
                               onClick={() => openShareDialog('document', doc.id)}
                               style={{ 
                                 fontSize: '11px', 
-                                padding: '4px 8px',
+                                padding: '2px 4px',
                                 backgroundColor: '#3498db',
                                 color: 'white'
                               }}
@@ -461,7 +461,7 @@ function FolderDetailPage({ currentUser }) {
                               onClick={() => deleteDocument(doc.id, doc.title)}
                               style={{ 
                                 fontSize: '11px', 
-                                padding: '4px 8px',
+                                padding: '2px 4px',
                                 backgroundColor: '#e74c3c',
                                 color: 'white'
                               }}
