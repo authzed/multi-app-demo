@@ -120,6 +120,16 @@ public class DocumentController {
             }
 
             
+            // Check if user is owner of this folder
+            CheckPermissionRequest ownerPermRequest = buildPermissionCheckWithZedtoken("folder", folderId.toString(), "delete", username, folder.getZedtoken());
+            CheckPermissionResponse ownerPermResponse = permClient.checkPermission(ownerPermRequest);
+            boolean isOwner = ownerPermResponse.getPermissionship() == CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION;
+            
+            // Check if user is editor of this folder
+            CheckPermissionRequest editorPermRequest = buildPermissionCheckWithZedtoken("folder", folderId.toString(), "create_content", username, folder.getZedtoken());
+            CheckPermissionResponse editorPermResponse = permClient.checkPermission(editorPermRequest);
+            boolean isEditor = editorPermResponse.getPermissionship() == CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION;
+
             // Get all subfolders and filter by permissions
             List<Folder> allSubFolders = folderRepository.findByParentFolderId(folderId);
             List<Folder> viewableSubFolders = new ArrayList<>();
@@ -149,6 +159,8 @@ public class DocumentController {
             response.put("subFolders", viewableSubFolders);
             response.put("documents", viewableDocuments);
             response.put("parentFolderId", folder.getParentFolder() != null ? folder.getParentFolder().getId() : null);
+            response.put("isOwner", isOwner);
+            response.put("isEditor", isEditor);
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {

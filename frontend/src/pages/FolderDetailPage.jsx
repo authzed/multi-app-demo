@@ -161,7 +161,24 @@ function FolderDetailPage({ currentUser }) {
   }
 
   const openShareDialog = (resourceType, resourceId) => {
+    if (!isOwner) {
+      return
+    }
     setShareDialog({ isOpen: true, resourceType, resourceId })
+  }
+
+  const handleNewFolderClick = () => {
+    if (!isEditor) {
+      return
+    }
+    setShowNewFolderForm(!showNewFolderForm)
+  }
+
+  const handleNewDocClick = () => {
+    if (!isEditor) {
+      return
+    }
+    setShowNewDocForm(!showNewDocForm)
   }
 
   const closeShareDialog = () => {
@@ -195,6 +212,8 @@ function FolderDetailPage({ currentUser }) {
   const subFolders = folderData?.subFolders || []
   const documents = folderData?.documents || []
   const parentFolderId = folderData?.parentFolderId
+  const isOwner = folderData?.isOwner || false
+  const isEditor = folderData?.isEditor || false
 
   return (
     <div className="page-container">
@@ -216,23 +235,41 @@ function FolderDetailPage({ currentUser }) {
               </WiredButton>
             )}
             <WiredButton 
-              onClick={() => setShowNewFolderForm(!showNewFolderForm)}
-              style={{ backgroundColor: '#3498db', color: 'white' }}
+              onClick={handleNewFolderClick}
+              disabled={!isEditor}
+              title={!isEditor ? "Only folder editors can create new folders" : "Create a new folder"}
+              style={{ 
+                backgroundColor: isEditor ? '#3498db' : '#95a5a6',
+                color: 'white',
+                opacity: isEditor ? 1 : 0.6
+              }}
             >
               + New Folder
             </WiredButton>
             <WiredButton 
-              onClick={() => setShowNewDocForm(!showNewDocForm)}
-              style={{ backgroundColor: '#2ecc71', color: 'white' }}
+              onClick={handleNewDocClick}
+              disabled={!isEditor}
+              title={!isEditor ? "Only folder editors can create new documents" : "Create a new document"}
+              style={{ 
+                backgroundColor: isEditor ? '#2ecc71' : '#95a5a6',
+                color: 'white',
+                opacity: isEditor ? 1 : 0.6
+              }}
             >
               + New Document
             </WiredButton>
             {currentFolder && !currentFolder.isRoot && (
               <WiredButton 
                 onClick={() => openShareDialog('folder', currentFolder.id)}
-                style={{ backgroundColor: '#3498db', color: 'white' }}
+                disabled={!isOwner}
+                title={!isOwner ? "Only folder owners can manage sharing permissions" : "Share this folder"}
+                style={{ 
+                  backgroundColor: isOwner ? '#3498db' : '#95a5a6',
+                  color: 'white',
+                  opacity: isOwner ? 1 : 0.6
+                }}
               >
-                Share Folder
+                Share
               </WiredButton>
             )}
           </div>
