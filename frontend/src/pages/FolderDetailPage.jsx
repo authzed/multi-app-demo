@@ -150,7 +150,12 @@ function FolderDetailPage({ currentUser }) {
       })
 
       if (response.ok) {
-        fetchFolderContents()
+        // Navigate to parent folder after successful deletion
+        if (parentFolderId) {
+          navigate(`/docs/folder/${parentFolderId}`)
+        } else {
+          navigate('/docs')
+        }
       } else {
         alert('Failed to delete folder')
       }
@@ -179,6 +184,26 @@ function FolderDetailPage({ currentUser }) {
       return
     }
     setShowNewDocForm(!showNewDocForm)
+  }
+
+  const handleDeleteFolder = () => {
+    if (!canDeleteFolder) {
+      return
+    }
+    deleteFolder(currentFolder.id, currentFolder.name)
+  }
+
+  const getDeleteTooltip = () => {
+    if (!currentFolder || currentFolder.isRoot) {
+      return "Cannot delete the root folder"
+    }
+    if (!isOwner) {
+      return "Only folder owners can delete folders"
+    }
+    if (!isFolderEmpty) {
+      return "Folder must be empty before it can be deleted"
+    }
+    return "Delete this folder"
   }
 
   const closeShareDialog = () => {
@@ -214,6 +239,8 @@ function FolderDetailPage({ currentUser }) {
   const parentFolderId = folderData?.parentFolderId
   const isOwner = folderData?.isOwner || false
   const isEditor = folderData?.isEditor || false
+  const isFolderEmpty = subFolders.length === 0 && documents.length === 0
+  const canDeleteFolder = isOwner && isFolderEmpty && currentFolder && !currentFolder.isRoot
 
   return (
     <div className="page-container">
@@ -270,6 +297,20 @@ function FolderDetailPage({ currentUser }) {
                 }}
               >
                 Share
+              </WiredButton>
+            )}
+            {currentFolder && !currentFolder.isRoot && (
+              <WiredButton 
+                onClick={handleDeleteFolder}
+                disabled={!canDeleteFolder}
+                title={getDeleteTooltip()}
+                style={{ 
+                  backgroundColor: canDeleteFolder ? '#e74c3c' : '#95a5a6',
+                  color: 'white',
+                  opacity: canDeleteFolder ? 1 : 0.6
+                }}
+              >
+                Delete
               </WiredButton>
             )}
           </div>
@@ -367,7 +408,7 @@ function FolderDetailPage({ currentUser }) {
                         textAlign: 'left', 
                         padding: '12px 8px', 
                         fontWeight: 'bold',
-                        width: '50%'
+                        width: '60%'
                       }}>
                         Name
                       </th>
@@ -386,14 +427,6 @@ function FolderDetailPage({ currentUser }) {
                         width: '20%'
                       }}>
                         Created
-                      </th>
-                      <th style={{ 
-                        textAlign: 'center', 
-                        padding: '12px 8px', 
-                        fontWeight: 'bold',
-                        width: '10%'
-                      }}>
-                        Actions
                       </th>
                     </tr>
                   </thead>
@@ -419,38 +452,6 @@ function FolderDetailPage({ currentUser }) {
                         </td>
                         <td style={{ padding: '12px 8px', color: '#888', fontSize: '14px' }}>
                           {new Date(folder.createdAt).toLocaleDateString()}
-                        </td>
-                        <td style={{ padding: '12px 8px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
-                            <WiredButton 
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                openShareDialog('folder', folder.id)
-                              }}
-                              style={{ 
-                                fontSize: '11px', 
-                                padding: '2px 4px',
-                                backgroundColor: '#3498db',
-                                color: 'white'
-                              }}
-                            >
-                              Share
-                            </WiredButton>
-                            <WiredButton 
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                deleteFolder(folder.id, folder.name)
-                              }}
-                              style={{ 
-                                fontSize: '11px', 
-                                padding: '2px 4px',
-                                backgroundColor: '#e74c3c',
-                                color: 'white'
-                              }}
-                            >
-                              Delete
-                            </WiredButton>
-                          </div>
                         </td>
                       </tr>
                     ))}
@@ -480,32 +481,6 @@ function FolderDetailPage({ currentUser }) {
                         </td>
                         <td style={{ padding: '12px 8px', color: '#888', fontSize: '14px' }}>
                           {new Date(doc.createdAt).toLocaleDateString()}
-                        </td>
-                        <td style={{ padding: '12px 8px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
-                            <WiredButton 
-                              onClick={() => openShareDialog('document', doc.id)}
-                              style={{ 
-                                fontSize: '11px', 
-                                padding: '2px 4px',
-                                backgroundColor: '#3498db',
-                                color: 'white'
-                              }}
-                            >
-                              Share
-                            </WiredButton>
-                            <WiredButton 
-                              onClick={() => deleteDocument(doc.id, doc.title)}
-                              style={{ 
-                                fontSize: '11px', 
-                                padding: '2px 4px',
-                                backgroundColor: '#e74c3c',
-                                color: 'white'
-                              }}
-                            >
-                              Delete
-                            </WiredButton>
-                          </div>
                         </td>
                       </tr>
                     ))}
