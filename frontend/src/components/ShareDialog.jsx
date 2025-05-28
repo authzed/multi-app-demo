@@ -9,6 +9,7 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
   const [saving, setSaving] = useState(false)
   const [newUsername, setNewUsername] = useState('')
   const [newRole, setNewRole] = useState('viewer')
+  const [copyLinkSuccess, setCopyLinkSuccess] = useState(false)
 
   useEffect(() => {
     if (isOpen && resourceType && resourceId) {
@@ -209,6 +210,27 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
     }
   }
 
+  const generatePermalink = () => {
+    const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin
+    if (resourceType === 'document') {
+      return `${baseUrl}/docs/document/${resourceId}`
+    } else {
+      return `${baseUrl}/docs/folder/${resourceId}`
+    }
+  }
+
+  const copyLink = async () => {
+    try {
+      const permalink = generatePermalink()
+      await navigator.clipboard.writeText(permalink)
+      setCopyLinkSuccess(true)
+      setTimeout(() => setCopyLinkSuccess(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy link:', error)
+      alert('Failed to copy link to clipboard')
+    }
+  }
+
   if (!isOpen) return null
 
   const visibleShares = shares.filter(share => !share.isDeleted)
@@ -297,6 +319,17 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
               </div>
 
               <div className="dialog-actions">
+                <WiredButton
+                  onClick={copyLink}
+                  disabled={saving}
+                  style={{ 
+                    backgroundColor: copyLinkSuccess ? '#2ecc71' : '#9b59b6', 
+                    color: 'white',
+                    marginRight: 'auto'
+                  }}
+                >
+                  {copyLinkSuccess ? '✓ Copied!' : 'Copy Link'}
+                </WiredButton>
                 <WiredButton
                   onClick={onClose}
                   disabled={saving}
