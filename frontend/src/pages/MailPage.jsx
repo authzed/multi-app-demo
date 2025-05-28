@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
 import './PageLayout.css'
 
@@ -6,12 +6,7 @@ function MailPage({ currentUser }) {
   const [emails, setEmails] = useState([])
   const [newEmail, setNewEmail] = useState({ subject: '', from: '', body: '' })
 
-  useEffect(() => {
-    fetchEmails()
-    setNewEmail({ ...newEmail, from: currentUser.username + '@company.com' })
-  }, [currentUser])
-
-  const fetchEmails = async () => {
+  const fetchEmails = useCallback(async () => {
     try {
       const response = await fetch('http://localhost:3002/emails')
       const data = await response.json()
@@ -19,7 +14,12 @@ function MailPage({ currentUser }) {
     } catch (error) {
       console.error('Error fetching emails:', error)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchEmails()
+    setNewEmail(prevEmail => ({ ...prevEmail, from: currentUser.username + '@company.com' }))
+  }, [currentUser, fetchEmails])
 
   const sendEmail = async () => {
     if (!newEmail.subject.trim() || !newEmail.from.trim()) return

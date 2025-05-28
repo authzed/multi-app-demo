@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { WiredCard, WiredButton, WiredInput, WiredCombo, WiredItem } from 'wired-elements-react'
 import './ShareDialog.css'
 
@@ -11,13 +11,7 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
   const [newRole, setNewRole] = useState('viewer')
   const [copyLinkSuccess, setCopyLinkSuccess] = useState(false)
 
-  useEffect(() => {
-    if (isOpen && resourceType && resourceId) {
-      fetchShares()
-    }
-  }, [isOpen, resourceType, resourceId])
-
-  const fetchShares = async () => {
+  const fetchShares = useCallback(async () => {
     setLoading(true)
     try {
       const endpoint = resourceType === 'document' 
@@ -48,7 +42,13 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
     } finally {
       setLoading(false)
     }
-  }
+  }, [resourceType, resourceId, currentUser.username, onClose])
+
+  useEffect(() => {
+    if (isOpen && resourceType && resourceId) {
+      fetchShares()
+    }
+  }, [isOpen, resourceType, resourceId, fetchShares])
 
   const getRoleDisplayName = (role) => {
     if (resourceType === 'document') {

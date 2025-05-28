@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
 import ShareDialog from '../components/ShareDialog'
@@ -16,11 +16,7 @@ function DocumentEditPage({ currentUser }) {
   const [content, setContent] = useState('')
   const [shareDialog, setShareDialog] = useState({ isOpen: false })
 
-  useEffect(() => {
-    fetchDocument()
-  }, [documentId, currentUser])
-
-  const fetchDocument = async () => {
+  const fetchDocument = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`http://localhost:3003/documents/${documentId}`, {
@@ -48,7 +44,11 @@ function DocumentEditPage({ currentUser }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [documentId, currentUser])
+
+  useEffect(() => {
+    fetchDocument()
+  }, [fetchDocument])
 
   const hasChanges = () => {
     if (!originalDocument) return false

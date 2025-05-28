@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredCombo, WiredItem } from 'wired-elements-react'
 import './PageLayout.css'
@@ -14,12 +14,7 @@ function GroupDetailPage({ currentUser }) {
   const [error, setError] = useState(null)
   const [permissionDenied, setPermissionDenied] = useState(false)
 
-  useEffect(() => {
-    fetchGroupDetails()
-    fetchGroupMembers()
-  }, [id])
-
-  const fetchGroupDetails = async () => {
+  const fetchGroupDetails = useCallback(async () => {
     try {
       const response = await fetch('http://localhost:3001/groups')
       const groups = await response.json()
@@ -36,9 +31,9 @@ function GroupDetailPage({ currentUser }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
 
-  const fetchGroupMembers = async () => {
+  const fetchGroupMembers = useCallback(async () => {
     try {
       const response = await fetch(`http://localhost:3001/groups/${id}/members`, {
         headers: {
@@ -60,7 +55,12 @@ function GroupDetailPage({ currentUser }) {
     } catch (error) {
       console.error('Error fetching group members:', error)
     }
-  }
+  }, [id, currentUser.username])
+
+  useEffect(() => {
+    fetchGroupDetails()
+    fetchGroupMembers()
+  }, [fetchGroupDetails, fetchGroupMembers])
 
   const addMember = async () => {
     if (!newMemberUsername.trim()) return

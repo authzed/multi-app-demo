@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom'
-import { useState } from 'react'
 import { WiredButton, WiredCard } from 'wired-elements-react'
 import UserProfilePicker from './UserProfilePicker'
 import './Header.css'

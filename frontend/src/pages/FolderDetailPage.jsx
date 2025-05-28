@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
 import ShareDialog from '../components/ShareDialog'
@@ -17,11 +17,7 @@ function FolderDetailPage({ currentUser }) {
   const [newFolderName, setNewFolderName] = useState('')
   const [shareDialog, setShareDialog] = useState({ isOpen: false, resourceType: null, resourceId: null })
 
-  useEffect(() => {
-    fetchFolderContents()
-  }, [folderId, currentUser])
-
-  const fetchFolderContents = async () => {
+  const fetchFolderContents = useCallback(async () => {
     try {
       setLoading(true)
       const url = folderId ? 
@@ -50,7 +46,11 @@ function FolderDetailPage({ currentUser }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [folderId, currentUser])
+
+  useEffect(() => {
+    fetchFolderContents()
+  }, [fetchFolderContents])
 
   const createDocument = async () => {
     if (!newDocTitle.trim()) return

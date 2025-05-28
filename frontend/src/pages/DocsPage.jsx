@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
 import './PageLayout.css'
 
@@ -6,11 +6,7 @@ function DocsPage({ currentUser }) {
   const [documents, setDocuments] = useState([])
   const [newDoc, setNewDoc] = useState({ title: '', content: '' })
 
-  useEffect(() => {
-    fetchDocuments()
-  }, [currentUser])
-
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     try {
       const response = await fetch('http://localhost:3003/documents', {
         headers: {
@@ -22,7 +18,11 @@ function DocsPage({ currentUser }) {
     } catch (error) {
       console.error('Error fetching documents:', error)
     }
-  }
+  }, [currentUser])
+
+  useEffect(() => {
+    fetchDocuments()
+  }, [fetchDocuments])
 
   const createDocument = async () => {
     if (!newDoc.title.trim()) return
