@@ -107,7 +107,13 @@ public class FolderService {
                             .build())
                     .build();
 
-            permClient.writeRelationships(writeRequest);
+            WriteRelationshipsResponse writeResponse = permClient.writeRelationships(writeRequest);
+            
+            // Store the zedtoken for read-after-write consistency
+            String zedtoken = writeResponse.getWrittenAt().getToken();
+            rootFolder.setZedtoken(zedtoken);
+            folderRepository.save(rootFolder);
+            
             System.out.println("Created world editor relationship for root folder: " + rootFolder.getId());
             
         } catch (Exception e) {

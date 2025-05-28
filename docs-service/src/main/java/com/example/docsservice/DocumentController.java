@@ -61,6 +61,33 @@ public class DocumentController {
         return SchemaServiceGrpc.newBlockingStub(spiceDBChannel)
                 .withCallCredentials(bearerToken);
     }
+    
+    private CheckPermissionRequest.Builder buildPermissionCheck(String resourceType, String resourceId, String permission, String username) {
+        return CheckPermissionRequest.newBuilder()
+                .setResource(ObjectReference.newBuilder()
+                        .setObjectType(resourceType)
+                        .setObjectId(resourceId)
+                        .build())
+                .setPermission(permission)
+                .setSubject(SubjectReference.newBuilder()
+                        .setObject(ObjectReference.newBuilder()
+                                .setObjectType("user")
+                                .setObjectId(username)
+                                .build())
+                        .build());
+    }
+    
+    private CheckPermissionRequest buildPermissionCheckWithZedtoken(String resourceType, String resourceId, String permission, String username, String zedtoken) {
+        CheckPermissionRequest.Builder builder = buildPermissionCheck(resourceType, resourceId, permission, username);
+        if (zedtoken != null && !zedtoken.isEmpty()) {
+            builder.setConsistency(Consistency.newBuilder()
+                    .setAtLeastAsFresh(ZedToken.newBuilder()
+                            .setToken(zedtoken)
+                            .build())
+                    .build());
+        }
+        return builder.build();
+    }
 
     @GetMapping("/health")
     public Map<String, String> health() {
@@ -78,53 +105,27 @@ public class DocumentController {
         try {
             PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
             
-            // Check if user can view this folder
-            CheckPermissionRequest folderPermRequest = CheckPermissionRequest.newBuilder()
-                    .setResource(ObjectReference.newBuilder()
-                            .setObjectType("folder")
-                            .setObjectId(folderId.toString())
-                            .build())
-                    .setPermission("view")
-                    .setSubject(SubjectReference.newBuilder()
-                            .setObject(ObjectReference.newBuilder()
-                                    .setObjectType("user")
-                                    .setObjectId(username)
-                                    .build())
-                            .build())
-                    .build();
-
+            // Get folder from database first to get its zedtoken
+            Optional<Folder> folderOpt = folderRepository.findById(folderId);
+            if (folderOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            Folder folder = folderOpt.get();
+            
+            // Check if user can view this folder with zedtoken consistency
+            CheckPermissionRequest folderPermRequest = buildPermissionCheckWithZedtoken("folder", folderId.toString(), "view", username, folder.getZedtoken());
             CheckPermissionResponse folderPermResponse = permClient.checkPermission(folderPermRequest);
             if (folderPermResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
                 return ResponseEntity.status(403).build();
             }
 
-            // Get folder from database
-            Optional<Folder> folderOpt = folderRepository.findById(folderId);
-            if (folderOpt.isEmpty()) {
-                return ResponseEntity.notFound().build();
-            }
-
-            Folder folder = folderOpt.get();
             
             // Get all subfolders and filter by permissions
             List<Folder> allSubFolders = folderRepository.findByParentFolderId(folderId);
             List<Folder> viewableSubFolders = new ArrayList<>();
             
             for (Folder subFolder : allSubFolders) {
-                CheckPermissionRequest subFolderPermRequest = CheckPermissionRequest.newBuilder()
-                        .setResource(ObjectReference.newBuilder()
-                                .setObjectType("folder")
-                                .setObjectId(subFolder.getId().toString())
-                                .build())
-                        .setPermission("view")
-                        .setSubject(SubjectReference.newBuilder()
-                                .setObject(ObjectReference.newBuilder()
-                                        .setObjectType("user")
-                                        .setObjectId(username)
-                                        .build())
-                                .build())
-                        .build();
-
+                CheckPermissionRequest subFolderPermRequest = buildPermissionCheckWithZedtoken("folder", subFolder.getId().toString(), "view", username, subFolder.getZedtoken());
                 CheckPermissionResponse subFolderPermResponse = permClient.checkPermission(subFolderPermRequest);
                 if (subFolderPermResponse.getPermissionship() == CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
                     viewableSubFolders.add(subFolder);
@@ -136,20 +137,7 @@ public class DocumentController {
             List<Document> viewableDocuments = new ArrayList<>();
             
             for (Document document : allDocuments) {
-                CheckPermissionRequest docPermRequest = CheckPermissionRequest.newBuilder()
-                        .setResource(ObjectReference.newBuilder()
-                                .setObjectType("document")
-                                .setObjectId(document.getId().toString())
-                                .build())
-                        .setPermission("view")
-                        .setSubject(SubjectReference.newBuilder()
-                                .setObject(ObjectReference.newBuilder()
-                                        .setObjectType("user")
-                                        .setObjectId(username)
-                                        .build())
-                                .build())
-                        .build();
-
+                CheckPermissionRequest docPermRequest = buildPermissionCheckWithZedtoken("document", document.getId().toString(), "view", username, document.getZedtoken());
                 CheckPermissionResponse docPermResponse = permClient.checkPermission(docPermRequest);
                 if (docPermResponse.getPermissionship() == CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
                     viewableDocuments.add(document);
@@ -271,7 +259,12 @@ public class DocumentController {
                             .build())
                     .build();
             
-            permClient.writeRelationships(writeRequest);
+            WriteRelationshipsResponse writeResponse = permClient.writeRelationships(writeRequest);
+            
+            // Store the zedtoken for read-after-write consistency
+            String zedtoken = writeResponse.getWrittenAt().getToken();
+            savedFolder.setZedtoken(zedtoken);
+            folderRepository.save(savedFolder);
             
             return ResponseEntity.ok(savedFolder);
         } catch (Exception e) {
@@ -302,49 +295,24 @@ public class DocumentController {
             
             Folder folder = null;
             if (folderId != null) {
-                // Check if user can create content in this folder
-                CheckPermissionRequest folderPermRequest = CheckPermissionRequest.newBuilder()
-                        .setResource(ObjectReference.newBuilder()
-                                .setObjectType("folder")
-                                .setObjectId(folderId.toString())
-                                .build())
-                        .setPermission("create_content")
-                        .setSubject(SubjectReference.newBuilder()
-                                .setObject(ObjectReference.newBuilder()
-                                        .setObjectType("user")
-                                        .setObjectId(username)
-                                        .build())
-                                .build())
-                        .build();
-
-                CheckPermissionResponse folderPermResponse = permClient.checkPermission(folderPermRequest);
-                if (folderPermResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
-                    return ResponseEntity.status(403).build();
-                }
-                
+                // Get folder first to access its zedtoken
                 Optional<Folder> folderOpt = folderRepository.findById(folderId);
                 if (folderOpt.isEmpty()) {
                     return ResponseEntity.notFound().build();
                 }
                 folder = folderOpt.get();
+                
+                // Check if user can create content in this folder with zedtoken consistency
+                CheckPermissionRequest folderPermRequest = buildPermissionCheckWithZedtoken("folder", folderId.toString(), "create_content", username, folder.getZedtoken());
+                CheckPermissionResponse folderPermResponse = permClient.checkPermission(folderPermRequest);
+                if (folderPermResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                    return ResponseEntity.status(403).build();
+                }
             } else {
                 folder = folderService.getRootFolder();
                 
-                // Check if user can create content in root folder
-                CheckPermissionRequest rootPermRequest = CheckPermissionRequest.newBuilder()
-                        .setResource(ObjectReference.newBuilder()
-                                .setObjectType("folder")
-                                .setObjectId(folder.getId().toString())
-                                .build())
-                        .setPermission("create_content")
-                        .setSubject(SubjectReference.newBuilder()
-                                .setObject(ObjectReference.newBuilder()
-                                        .setObjectType("user")
-                                        .setObjectId(username)
-                                        .build())
-                                .build())
-                        .build();
-
+                // Check if user can create content in root folder with zedtoken consistency
+                CheckPermissionRequest rootPermRequest = buildPermissionCheckWithZedtoken("folder", folder.getId().toString(), "create_content", username, folder.getZedtoken());
                 CheckPermissionResponse rootPermResponse = permClient.checkPermission(rootPermRequest);
                 if (rootPermResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
                     return ResponseEntity.status(403).build();
@@ -374,7 +342,12 @@ public class DocumentController {
                             .build())
                     .build();
             
-            permClient.writeRelationships(writeRequest);
+            WriteRelationshipsResponse writeResponse = permClient.writeRelationships(writeRequest);
+            
+            // Store the zedtoken for read-after-write consistency
+            String zedtoken = writeResponse.getWrittenAt().getToken();
+            savedDocument.setZedtoken(zedtoken);
+            documentRepository.save(savedDocument);
             
             return ResponseEntity.ok(savedDocument);
         } catch (Exception e) {
@@ -813,7 +786,25 @@ public class DocumentController {
 
             // Execute the write request if there are updates
             if (writeRequestBuilder.getUpdatesCount() > 0) {
-                permClient.writeRelationships(writeRequestBuilder.build());
+                WriteRelationshipsResponse writeResponse = permClient.writeRelationships(writeRequestBuilder.build());
+                
+                // Store the zedtoken for read-after-write consistency
+                String zedtoken = writeResponse.getWrittenAt().getToken();
+                if ("document".equals(resourceType)) {
+                    Optional<Document> docOpt = documentRepository.findById(UUID.fromString(resourceId));
+                    if (docOpt.isPresent()) {
+                        Document doc = docOpt.get();
+                        doc.setZedtoken(zedtoken);
+                        documentRepository.save(doc);
+                    }
+                } else if ("folder".equals(resourceType)) {
+                    Optional<Folder> folderOpt = folderRepository.findById(UUID.fromString(resourceId));
+                    if (folderOpt.isPresent()) {
+                        Folder folder = folderOpt.get();
+                        folder.setZedtoken(zedtoken);
+                        folderRepository.save(folder);
+                    }
+                }
             }
 
             return ResponseEntity.ok(Map.of("status", "success"));

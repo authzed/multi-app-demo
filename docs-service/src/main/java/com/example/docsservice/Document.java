@@ -31,6 +31,9 @@ public class Document {
     
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+    
+    @Column(name = "zedtoken")
+    private String zedtoken;
 
     public Document() {
         this.createdAt = LocalDateTime.now();
@@ -67,4 +70,7 @@ public class Document {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getZedtoken() { return zedtoken; }
+    public void setZedtoken(String zedtoken) { this.zedtoken = zedtoken; }
 }
