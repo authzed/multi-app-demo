@@ -89,6 +89,10 @@ function DocumentEditPage({ currentUser }) {
   }
 
   const deleteDocument = async () => {
+    if (!isOwner) {
+      return
+    }
+    
     if (!window.confirm(`Are you sure you want to delete "${document.title}"?`)) {
       return
     }
@@ -135,7 +139,12 @@ function DocumentEditPage({ currentUser }) {
     }
   }
 
+  const isOwner = document?.owners && document.owners.includes(currentUser.username)
+
   const openShareDialog = () => {
+    if (!isOwner) {
+      return
+    }
     setShareDialog({ isOpen: true })
   }
 
@@ -198,24 +207,28 @@ function DocumentEditPage({ currentUser }) {
             </WiredButton>
             <WiredButton 
               onClick={openShareDialog}
+              disabled={!isOwner}
+              title={!isOwner ? "Only document owners can manage sharing permissions" : "Share this document"}
               style={{ 
-                backgroundColor: '#3498db',
-                color: 'white'
+                backgroundColor: isOwner ? '#3498db' : '#95a5a6',
+                color: 'white',
+                opacity: isOwner ? 1 : 0.6
               }}
             >
               Share
             </WiredButton>
-            {document.owners && document.owners.includes(currentUser.username) && (
-              <WiredButton 
-                onClick={deleteDocument}
-                style={{ 
-                  backgroundColor: '#e74c3c',
-                  color: 'white'
-                }}
-              >
-                Delete
-              </WiredButton>
-            )}
+            <WiredButton 
+              onClick={deleteDocument}
+              disabled={!isOwner}
+              title={!isOwner ? "Only document owners can delete this document" : "Delete this document"}
+              style={{ 
+                backgroundColor: isOwner ? '#e74c3c' : '#95a5a6',
+                color: 'white',
+                opacity: isOwner ? 1 : 0.6
+              }}
+            >
+              Delete
+            </WiredButton>
           </div>
         </div>
       </div>
