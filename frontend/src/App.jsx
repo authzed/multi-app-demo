@@ -4,7 +4,7 @@ import Header from './components/Header'
 import GroupsPage from './pages/GroupsPage'
 import GroupDetailPage from './pages/GroupDetailPage'
 import MailPage from './pages/MailPage'
-import DocsPage from './pages/DocsPage'
+import FolderDetailPage from './pages/FolderDetailPage'
 import './App.css'
 
 const users = [
@@ -28,7 +28,8 @@ function App() {
             <Route path="/groups" element={<GroupsPage currentUser={currentUser} />} />
             <Route path="/groups/:id" element={<GroupDetailPage currentUser={currentUser} />} />
             <Route path="/mail" element={<MailPage currentUser={currentUser} />} />
-            <Route path="/docs" element={<DocsPage currentUser={currentUser} />} />
+            <Route path="/docs" element={<FolderDetailPage currentUser={currentUser} />} />
+            <Route path="/docs/folder/:folderId" element={<FolderDetailPage currentUser={currentUser} />} />
             <Route path="/" element={<GroupsPage currentUser={currentUser} />} />
           </Routes>
         </main>

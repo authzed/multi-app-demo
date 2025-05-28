@@ -13,32 +13,131 @@ public class DocumentController {
 
     @Autowired
     private DocumentRepository documentRepository;
+    
+    @Autowired
+    private FolderRepository folderRepository;
+    
+    @Autowired
+    private FolderService folderService;
 
     @GetMapping("/health")
     public Map<String, String> health() {
         return Map.of("status", "healthy", "service", "docs");
     }
 
-    @GetMapping("/documents")
-    public List<Document> getDocuments(@RequestHeader(value = "X-Username", required = false) String username) {
-        if (username != null && !username.isEmpty()) {
-            return documentRepository.findByOwner(username);
+    // Folder endpoints
+    @GetMapping("/folders/{folderId}")
+    public ResponseEntity<Map<String, Object>> getFolderContents(@PathVariable Long folderId,
+                                                               @RequestHeader(value = "X-Username", required = false) String username) {
+        if (username == null || username.isEmpty()) {
+            return ResponseEntity.badRequest().build();
         }
-        return documentRepository.findAll();
+
+        Optional<Folder> folderOpt = folderRepository.findByIdAndViewer(folderId, username);
+        if (folderOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Folder folder = folderOpt.get();
+        List<Folder> subFolders = folderRepository.findByParentFolderIdAndViewer(folderId, username);
+        List<Document> documents = documentRepository.findByFolderIdAndViewer(folderId, username);
+
+        Map<String, Object> response = Map.of(
+            "folder", folder,
+            "subFolders", subFolders,
+            "documents", documents
+        );
+
+        return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/documents")
-    public Document createDocument(@RequestBody Document document, 
-                                 @RequestHeader(value = "X-Username", required = false) String username) {
-        if (username != null && !username.isEmpty()) {
-            document.setOwner(username);
+    @GetMapping("/folders/root")
+    public ResponseEntity<Map<String, Object>> getRootFolderContents(@RequestHeader(value = "X-Username", required = false) String username) {
+        if (username == null || username.isEmpty()) {
+            return ResponseEntity.badRequest().build();
         }
-        return documentRepository.save(document);
+
+        Folder rootFolder = folderService.getRootFolder();
+        
+        // Add user as viewer if not already present
+        if (!rootFolder.getViewers().contains(username)) {
+            rootFolder.getViewers().add(username);
+            folderRepository.save(rootFolder);
+        }
+
+        return getFolderContents(rootFolder.getId(), username);
+    }
+
+    @PostMapping("/folders")
+    public ResponseEntity<Folder> createFolder(@RequestBody Map<String, Object> request,
+                                             @RequestHeader(value = "X-Username", required = false) String username) {
+        if (username == null || username.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        String name = (String) request.get("name");
+        Long parentFolderId = request.get("parentFolderId") != null ? 
+            Long.valueOf(request.get("parentFolderId").toString()) : null;
+
+        if (name == null || name.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Folder parentFolder = null;
+        if (parentFolderId != null) {
+            Optional<Folder> parentOpt = folderRepository.findByIdAndViewer(parentFolderId, username);
+            if (parentOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            parentFolder = parentOpt.get();
+        } else {
+            parentFolder = folderService.getRootFolder();
+        }
+
+        Folder newFolder = new Folder(name.trim(), username, parentFolder);
+        return ResponseEntity.ok(folderRepository.save(newFolder));
+    }
+
+    // Document endpoints
+    @PostMapping("/documents")
+    public ResponseEntity<Document> createDocument(@RequestBody Map<String, Object> request,
+                                                 @RequestHeader(value = "X-Username", required = false) String username) {
+        if (username == null || username.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        String title = (String) request.get("title");
+        String content = (String) request.get("content");
+        Long folderId = request.get("folderId") != null ? 
+            Long.valueOf(request.get("folderId").toString()) : null;
+
+        if (title == null || title.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Folder folder = null;
+        if (folderId != null) {
+            Optional<Folder> folderOpt = folderRepository.findByIdAndViewer(folderId, username);
+            if (folderOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            folder = folderOpt.get();
+        } else {
+            folder = folderService.getRootFolder();
+        }
+
+        Document document = new Document(title.trim(), content != null ? content : "", username, folder);
+        return ResponseEntity.ok(documentRepository.save(document));
     }
 
     @GetMapping("/documents/{id}")
-    public ResponseEntity<Document> getDocument(@PathVariable Long id) {
-        Optional<Document> document = documentRepository.findById(id);
+    public ResponseEntity<Document> getDocument(@PathVariable Long id,
+                                              @RequestHeader(value = "X-Username", required = false) String username) {
+        if (username == null || username.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Optional<Document> document = documentRepository.findByIdAndViewer(id, username);
         if (document.isPresent()) {
             return ResponseEntity.ok(document.get());
         }
@@ -46,9 +145,14 @@ public class DocumentController {
     }
 
     @PutMapping("/documents/{id}")
-    public ResponseEntity<Document> updateDocument(@PathVariable Long id, 
-                                                 @RequestBody Document updatedDocument) {
-        Optional<Document> existingDocument = documentRepository.findById(id);
+    public ResponseEntity<Document> updateDocument(@PathVariable Long id,
+                                                 @RequestBody Document updatedDocument,
+                                                 @RequestHeader(value = "X-Username", required = false) String username) {
+        if (username == null || username.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Optional<Document> existingDocument = documentRepository.findByIdAndViewer(id, username);
         if (existingDocument.isPresent()) {
             Document document = existingDocument.get();
             document.setTitle(updatedDocument.getTitle());
@@ -59,9 +163,30 @@ public class DocumentController {
     }
 
     @DeleteMapping("/documents/{id}")
-    public ResponseEntity<Void> deleteDocument(@PathVariable Long id) {
-        if (documentRepository.existsById(id)) {
+    public ResponseEntity<Void> deleteDocument(@PathVariable Long id,
+                                             @RequestHeader(value = "X-Username", required = false) String username) {
+        if (username == null || username.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Optional<Document> document = documentRepository.findByIdAndViewer(id, username);
+        if (document.isPresent()) {
             documentRepository.deleteById(id);
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @DeleteMapping("/folders/{id}")
+    public ResponseEntity<Void> deleteFolder(@PathVariable Long id,
+                                           @RequestHeader(value = "X-Username", required = false) String username) {
+        if (username == null || username.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Optional<Folder> folder = folderRepository.findByIdAndViewer(id, username);
+        if (folder.isPresent() && !folder.get().getIsRoot()) {
+            folderRepository.deleteById(id);
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.notFound().build();
