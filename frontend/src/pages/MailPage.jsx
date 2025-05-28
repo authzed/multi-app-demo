@@ -4,11 +4,11 @@ import './PageLayout.css'
 
 function MailPage({ currentUser }) {
   const [emails, setEmails] = useState([])
-  const [newEmail, setNewEmail] = useState({ subject: '', from: '', body: '' })
+  const [newEmail, setNewEmail] = useState({ subject: '', to: '', body: '' })
 
   const fetchEmails = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3002/emails')
+      const response = await fetch('http://localhost:3002/emails/sent')
       const data = await response.json()
       setEmails(data)
     } catch (error) {
@@ -18,21 +18,24 @@ function MailPage({ currentUser }) {
 
   useEffect(() => {
     fetchEmails()
-    setNewEmail(prevEmail => ({ ...prevEmail, from: currentUser.username + '@company.com' }))
   }, [currentUser, fetchEmails])
 
   const sendEmail = async () => {
-    if (!newEmail.subject.trim() || !newEmail.from.trim()) return
+    if (!newEmail.subject.trim() || !newEmail.to.trim()) return
 
     try {
-      const response = await fetch('http://localhost:3002/emails', {
+      const emailToSend = {
+        ...newEmail,
+        from: currentUser.username + '@company.com'
+      }
+      const response = await fetch('http://localhost:3002/emails/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newEmail)
+        body: JSON.stringify(emailToSend)
       })
       const createdEmail = await response.json()
       setEmails([...emails, createdEmail])
-      setNewEmail({ subject: '', from: currentUser.username + '@company.com', body: '' })
+      setNewEmail({ subject: '', to: '', body: '' })
     } catch (error) {
       console.error('Error sending email:', error)
     }
@@ -50,9 +53,9 @@ function MailPage({ currentUser }) {
           <div className="form-row">
             <WiredInput 
               className="form-input"
-              placeholder="From"
-              value={newEmail.from}
-              onChange={(e) => setNewEmail({...newEmail, from: e.target.value})}
+              placeholder="To"
+              value={newEmail.to}
+              onChange={(e) => setNewEmail({...newEmail, to: e.target.value})}
             />
           </div>
           <div className="form-row">
@@ -77,25 +80,35 @@ function MailPage({ currentUser }) {
           </div>
         </WiredCard>
 
-        <div className="content-section">
-          <WiredCard>
-            <h3>Inbox</h3>
-            <div className="items-grid">
-              {emails.map(email => (
-                <WiredCard key={email.id} className="item-card">
-                  <div><strong>From:</strong> {email.from}</div>
-                  <div><strong>Subject:</strong> {email.subject}</div>
-                  <div style={{ marginTop: '10px', color: '#555' }}>{email.body}</div>
-                </WiredCard>
-              ))}
-              {emails.length === 0 && (
-                <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
-                  No emails in inbox. Send your first email above!
-                </p>
-              )}
-            </div>
-          </WiredCard>
-        </div>
+        <WiredCard style={{ width: '100%', marginTop: '20px' }}>
+          <h3>Outbox</h3>
+          {emails.length === 0 ? (
+            <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
+              No emails sent yet. Send your first email above!
+            </p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #333' }}>
+                  <th style={{ padding: '10px', textAlign: 'left', borderRight: '1px solid #ddd' }}>From</th>
+                  <th style={{ padding: '10px', textAlign: 'left', borderRight: '1px solid #ddd' }}>To</th>
+                  <th style={{ padding: '10px', textAlign: 'left', borderRight: '1px solid #ddd' }}>Subject</th>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>Sent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {emails.map(email => (
+                  <tr key={email.id} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '10px', borderRight: '1px solid #ddd' }}>{email.from}</td>
+                    <td style={{ padding: '10px', borderRight: '1px solid #ddd' }}>{email.to}</td>
+                    <td style={{ padding: '10px', borderRight: '1px solid #ddd' }}>{email.subject}</td>
+                    <td style={{ padding: '10px' }}>{new Date(email.sentAt).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </WiredCard>
       </div>
     </div>
   )

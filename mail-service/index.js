@@ -8,30 +8,28 @@ const PORT = 3002;
 app.use(cors());
 app.use(express.json());
 
-const emails = [
-  { id: '1', subject: 'Welcome to the platform', from: 'admin@company.com', body: 'Welcome message...' },
-  { id: '2', subject: 'Weekly Update', from: 'team@company.com', body: 'This week updates...' }
-];
+const sentEmails = [];
 
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', service: 'mail' });
 });
 
-app.get('/emails', (req, res) => {
-  res.json(emails);
+app.get('/emails/sent', (req, res) => {
+  res.json(sentEmails);
 });
 
-app.post('/emails', (req, res) => {
+app.post('/emails/send', (req, res) => {
   const newEmail = {
     id: Date.now().toString(),
+    sentAt: new Date().toISOString(),
     ...req.body
   };
-  emails.push(newEmail);
+  sentEmails.push(newEmail);
   res.status(201).json(newEmail);
 });
 
-app.get('/emails/:id', (req, res) => {
-  const email = emails.find(e => e.id === req.params.id);
+app.get('/emails/sent/:id', (req, res) => {
+  const email = sentEmails.find(e => e.id === req.params.id);
   if (!email) {
     return res.status(404).json({ error: 'Email not found' });
   }
