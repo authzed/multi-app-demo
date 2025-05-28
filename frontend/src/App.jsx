@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Header from './components/Header'
 import GroupsPage from './pages/GroupsPage'
 import GroupDetailPage from './pages/GroupDetailPage'
@@ -17,7 +17,20 @@ const users = [
 ]
 
 function App() {
-  const [currentUser, setCurrentUser] = useState(users[0])
+  const [currentUser, setCurrentUser] = useState(() => {
+    // Initialize from localStorage or default to first user
+    const savedUserId = localStorage.getItem('selectedUserId')
+    if (savedUserId) {
+      const savedUser = users.find(user => user.id === parseInt(savedUserId))
+      return savedUser || users[0]
+    }
+    return users[0]
+  })
+
+  // Save to localStorage whenever user changes
+  useEffect(() => {
+    localStorage.setItem('selectedUserId', currentUser.id.toString())
+  }, [currentUser])
 
   return (
     <Router>

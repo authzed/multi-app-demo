@@ -1,0 +1,190 @@
+.share-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.share-dialog {
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.share-dialog-content {
+  padding: 20px;
+  background: #242424;
+  color: white;
+  border-radius: 8px;
+}
+
+.share-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 15px;
+}
+
+.share-dialog-header h3 {
+  margin: 0;
+  color: white;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #ccc;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-button:hover {
+  color: white;
+}
+
+.close-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 40px;
+  color: #ccc;
+}
+
+.share-section {
+  margin-bottom: 30px;
+}
+
+.share-section h4 {
+  margin: 0 0 15px 0;
+  color: white;
+  font-size: 16px;
+}
+
+.no-shares {
+  color: #999;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+  background-color: #333;
+  border-radius: 4px;
+}
+
+.shares-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.share-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background-color: #333;
+}
+
+.share-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+}
+
+.username {
+  font-weight: bold;
+  color: white;
+  min-width: 120px;
+}
+
+.role-select {
+  min-width: 150px;
+}
+
+.add-share-section {
+  border-top: 1px solid #555;
+  padding-top: 20px;
+  margin-bottom: 30px;
+}
+
+.add-share-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.username-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid #555;
+  padding-top: 20px;
+}
+
+.changes-indicator {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #4a4a00;
+  border: 1px solid #666600;
+  border-radius: 4px;
+  color: #ffff99;
+  text-align: center;
+  font-size: 14px;
+}
+
+@media (max-width: 600px) {
+  .share-dialog {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .add-share-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .username-input {
+    min-width: auto;
+  }
+  
+  .share-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  
+  .share-info {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .dialog-actions {
+    flex-direction: column;
+  }
+}

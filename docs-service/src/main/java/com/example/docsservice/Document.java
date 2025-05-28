@@ -20,13 +20,6 @@ public class Document {
     @Column(columnDefinition = "TEXT")
     private String content;
     
-    @Column(nullable = false)
-    private String owner;
-    
-    @ElementCollection
-    @CollectionTable(name = "document_viewers", joinColumns = @JoinColumn(name = "document_id"))
-    @Column(name = "viewer")
-    private List<String> viewers = new ArrayList<>();
     
     @ManyToOne
     @JoinColumn(name = "folder_id")
@@ -44,13 +37,11 @@ public class Document {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public Document(String title, String content, String owner, Folder folder) {
+    public Document(String title, String content, Folder folder) {
         this();
         this.title = title;
         this.content = content;
-        this.owner = owner;
         this.folder = folder;
-        this.viewers.add(owner); // Owner is always a viewer
     }
 
     @PreUpdate
@@ -67,11 +58,6 @@ public class Document {
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
 
-    public String getOwner() { return owner; }
-    public void setOwner(String owner) { this.owner = owner; }
-
-    public List<String> getViewers() { return viewers; }
-    public void setViewers(List<String> viewers) { this.viewers = viewers; }
 
     public Folder getFolder() { return folder; }
     public void setFolder(Folder folder) { this.folder = folder; }

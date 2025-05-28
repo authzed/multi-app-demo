@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
+import ShareDialog from '../components/ShareDialog'
 import './PageLayout.css'
 
 function DocumentEditPage({ currentUser }) {
@@ -13,6 +14,7 @@ function DocumentEditPage({ currentUser }) {
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+  const [shareDialog, setShareDialog] = useState({ isOpen: false })
 
   useEffect(() => {
     fetchDocument()
@@ -35,6 +37,8 @@ function DocumentEditPage({ currentUser }) {
         setContent(docData.content || '')
       } else if (response.status === 404) {
         setError('Document not found')
+      } else if (response.status === 403) {
+        setError('Permission denied - You do not have access to this document')
       } else {
         setError('Failed to load document')
       }
@@ -121,6 +125,14 @@ function DocumentEditPage({ currentUser }) {
     }
   }
 
+  const openShareDialog = () => {
+    setShareDialog({ isOpen: true })
+  }
+
+  const closeShareDialog = () => {
+    setShareDialog({ isOpen: false })
+  }
+
   if (loading) {
     return (
       <div className="page-container">
@@ -173,6 +185,15 @@ function DocumentEditPage({ currentUser }) {
               }}
             >
               {saving ? 'Saving...' : 'Save'}
+            </WiredButton>
+            <WiredButton 
+              onClick={openShareDialog}
+              style={{ 
+                backgroundColor: '#3498db',
+                color: 'white'
+              }}
+            >
+              Share
             </WiredButton>
             {document.owner === currentUser.username && (
               <WiredButton 
@@ -234,6 +255,14 @@ function DocumentEditPage({ currentUser }) {
           </WiredCard>
         </div>
       </div>
+      
+      <ShareDialog
+        isOpen={shareDialog.isOpen}
+        onClose={closeShareDialog}
+        resourceType="document"
+        resourceId={documentId}
+        currentUser={currentUser}
+      />
     </div>
   )
 }

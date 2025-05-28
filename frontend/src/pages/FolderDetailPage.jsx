@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
+import ShareDialog from '../components/ShareDialog'
 import './PageLayout.css'
 
 function FolderDetailPage({ currentUser }) {
@@ -14,6 +15,7 @@ function FolderDetailPage({ currentUser }) {
   const [newDocTitle, setNewDocTitle] = useState('')
   const [newDocContent, setNewDocContent] = useState('')
   const [newFolderName, setNewFolderName] = useState('')
+  const [shareDialog, setShareDialog] = useState({ isOpen: false, resourceType: null, resourceId: null })
 
   useEffect(() => {
     fetchFolderContents()
@@ -37,6 +39,8 @@ function FolderDetailPage({ currentUser }) {
         setFolderData(data)
       } else if (response.status === 404) {
         setError('Folder not found')
+      } else if (response.status === 403) {
+        setError('Permission denied - You do not have access to this folder')
       } else {
         setError('Failed to load folder')
       }
@@ -156,6 +160,14 @@ function FolderDetailPage({ currentUser }) {
     }
   }
 
+  const openShareDialog = (resourceType, resourceId) => {
+    setShareDialog({ isOpen: true, resourceType, resourceId })
+  }
+
+  const closeShareDialog = () => {
+    setShareDialog({ isOpen: false, resourceType: null, resourceId: null })
+  }
+
   if (loading) {
     return (
       <div className="page-container">
@@ -190,11 +202,6 @@ function FolderDetailPage({ currentUser }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h2>📁 {currentFolder?.name || 'Documents'}</h2>
-            {currentFolder && !currentFolder.isRoot && (
-              <p style={{ color: '#666', margin: '5px 0' }}>
-                Owner: {currentFolder.owner}
-              </p>
-            )}
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             {currentFolder && !currentFolder.isRoot && (
@@ -220,6 +227,14 @@ function FolderDetailPage({ currentUser }) {
             >
               + New Document
             </WiredButton>
+            {currentFolder && !currentFolder.isRoot && (
+              <WiredButton 
+                onClick={() => openShareDialog('folder', currentFolder.id)}
+                style={{ backgroundColor: '#3498db', color: 'white' }}
+              >
+                Share Folder
+              </WiredButton>
+            )}
           </div>
         </div>
       </div>
@@ -315,7 +330,7 @@ function FolderDetailPage({ currentUser }) {
                         textAlign: 'left', 
                         padding: '12px 8px', 
                         fontWeight: 'bold',
-                        width: '40%'
+                        width: '50%'
                       }}>
                         Name
                       </th>
@@ -323,17 +338,9 @@ function FolderDetailPage({ currentUser }) {
                         textAlign: 'left', 
                         padding: '12px 8px', 
                         fontWeight: 'bold',
-                        width: '15%'
-                      }}>
-                        Type
-                      </th>
-                      <th style={{ 
-                        textAlign: 'left', 
-                        padding: '12px 8px', 
-                        fontWeight: 'bold',
                         width: '20%'
                       }}>
-                        Owner
+                        Type
                       </th>
                       <th style={{ 
                         textAlign: 'left', 
@@ -347,7 +354,7 @@ function FolderDetailPage({ currentUser }) {
                         textAlign: 'center', 
                         padding: '12px 8px', 
                         fontWeight: 'bold',
-                        width: '5%'
+                        width: '10%'
                       }}>
                         Actions
                       </th>
@@ -373,14 +380,25 @@ function FolderDetailPage({ currentUser }) {
                         <td style={{ padding: '12px 8px', color: '#666' }}>
                           Folder
                         </td>
-                        <td style={{ padding: '12px 8px', color: '#666' }}>
-                          {folder.owner}
-                        </td>
                         <td style={{ padding: '12px 8px', color: '#888', fontSize: '14px' }}>
                           {new Date(folder.createdAt).toLocaleDateString()}
                         </td>
                         <td style={{ padding: '12px 8px', textAlign: 'center' }}>
-                          {folder.owner === currentUser.username && (
+                          <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                            <WiredButton 
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openShareDialog('folder', folder.id)
+                              }}
+                              style={{ 
+                                fontSize: '11px', 
+                                padding: '4px 8px',
+                                backgroundColor: '#3498db',
+                                color: 'white'
+                              }}
+                            >
+                              Share
+                            </WiredButton>
                             <WiredButton 
                               onClick={(e) => {
                                 e.stopPropagation()
@@ -395,7 +413,7 @@ function FolderDetailPage({ currentUser }) {
                             >
                               Delete
                             </WiredButton>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -423,14 +441,22 @@ function FolderDetailPage({ currentUser }) {
                         <td style={{ padding: '12px 8px', color: '#666' }}>
                           Document
                         </td>
-                        <td style={{ padding: '12px 8px', color: '#666' }}>
-                          {doc.owner}
-                        </td>
                         <td style={{ padding: '12px 8px', color: '#888', fontSize: '14px' }}>
                           {new Date(doc.createdAt).toLocaleDateString()}
                         </td>
                         <td style={{ padding: '12px 8px', textAlign: 'center' }}>
-                          {doc.owner === currentUser.username && (
+                          <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                            <WiredButton 
+                              onClick={() => openShareDialog('document', doc.id)}
+                              style={{ 
+                                fontSize: '11px', 
+                                padding: '4px 8px',
+                                backgroundColor: '#3498db',
+                                color: 'white'
+                              }}
+                            >
+                              Share
+                            </WiredButton>
                             <WiredButton 
                               onClick={() => deleteDocument(doc.id, doc.title)}
                               style={{ 
@@ -442,7 +468,7 @@ function FolderDetailPage({ currentUser }) {
                             >
                               Delete
                             </WiredButton>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -457,6 +483,14 @@ function FolderDetailPage({ currentUser }) {
           </WiredCard>
         </div>
       </div>
+      
+      <ShareDialog
+        isOpen={shareDialog.isOpen}
+        onClose={closeShareDialog}
+        resourceType={shareDialog.resourceType}
+        resourceId={shareDialog.resourceId}
+        currentUser={currentUser}
+      />
     </div>
   )
 }

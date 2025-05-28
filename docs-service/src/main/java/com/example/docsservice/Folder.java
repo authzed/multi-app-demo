@@ -18,14 +18,6 @@ public class Folder {
     @Column(nullable = false)
     private String name;
     
-    @Column(nullable = false)
-    private String owner;
-    
-    @ElementCollection
-    @CollectionTable(name = "folder_viewers", joinColumns = @JoinColumn(name = "folder_id"))
-    @Column(name = "viewer")
-    private List<String> viewers = new ArrayList<>();
-    
     @ManyToOne
     @JoinColumn(name = "parent_folder_id")
     @JsonBackReference("folder-parent")
@@ -53,12 +45,10 @@ public class Folder {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public Folder(String name, String owner, Folder parentFolder) {
+    public Folder(String name, Folder parentFolder) {
         this();
         this.name = name;
-        this.owner = owner;
         this.parentFolder = parentFolder;
-        this.viewers.add(owner); // Owner is always a viewer
     }
 
     @PreUpdate
@@ -73,11 +63,6 @@ public class Folder {
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
-    public String getOwner() { return owner; }
-    public void setOwner(String owner) { this.owner = owner; }
-
-    public List<String> getViewers() { return viewers; }
-    public void setViewers(List<String> viewers) { this.viewers = viewers; }
 
     public Folder getParentFolder() { return parentFolder; }
     public void setParentFolder(Folder parentFolder) { this.parentFolder = parentFolder; }

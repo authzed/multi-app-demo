@@ -3,10 +3,20 @@ package com.example.docsservice;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.stereotype.Component;
+import jakarta.annotation.PreDestroy;
+import jakarta.annotation.PostConstruct;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.HashMap;
+
+import com.authzed.api.v1.*;
+import com.authzed.grpcutil.BearerToken;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 
 @RestController
 @CrossOrigin(origins = "*")
@@ -20,6 +30,37 @@ public class DocumentController {
     
     @Autowired
     private FolderService folderService;
+    
+    private ManagedChannel spiceDBChannel;
+    private BearerToken bearerToken;
+    
+    @PostConstruct
+    private void initializeSpiceDBConnection() {
+        String endpoint = System.getenv().getOrDefault("SPICEDB_ENDPOINT", "localhost:50051");
+        String token = System.getenv().getOrDefault("SPICEDB_TOKEN", "testtesttesttest");
+        
+        this.spiceDBChannel = ManagedChannelBuilder.forTarget(endpoint)
+                .usePlaintext()
+                .build();
+        this.bearerToken = new BearerToken(token);
+    }
+    
+    @PreDestroy
+    private void shutdownSpiceDBConnection() {
+        if (spiceDBChannel != null && !spiceDBChannel.isShutdown()) {
+            spiceDBChannel.shutdown();
+        }
+    }
+    
+    private PermissionsServiceGrpc.PermissionsServiceBlockingStub getPermissionsClient() {
+        return PermissionsServiceGrpc.newBlockingStub(spiceDBChannel)
+                .withCallCredentials(bearerToken);
+    }
+    
+    private SchemaServiceGrpc.SchemaServiceBlockingStub getSchemaClient() {
+        return SchemaServiceGrpc.newBlockingStub(spiceDBChannel)
+                .withCallCredentials(bearerToken);
+    }
 
     @GetMapping("/health")
     public Map<String, String> health() {
@@ -34,22 +75,98 @@ public class DocumentController {
             return ResponseEntity.badRequest().build();
         }
 
-        Optional<Folder> folderOpt = folderRepository.findByIdAndViewer(folderId, username);
-        if (folderOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
+        try {
+            PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
+            
+            // Check if user can view this folder
+            CheckPermissionRequest folderPermRequest = CheckPermissionRequest.newBuilder()
+                    .setResource(ObjectReference.newBuilder()
+                            .setObjectType("folder")
+                            .setObjectId(folderId.toString())
+                            .build())
+                    .setPermission("view")
+                    .setSubject(SubjectReference.newBuilder()
+                            .setObject(ObjectReference.newBuilder()
+                                    .setObjectType("user")
+                                    .setObjectId(username)
+                                    .build())
+                            .build())
+                    .build();
+
+            CheckPermissionResponse folderPermResponse = permClient.checkPermission(folderPermRequest);
+            if (folderPermResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                return ResponseEntity.status(403).build();
+            }
+
+            // Get folder from database
+            Optional<Folder> folderOpt = folderRepository.findById(folderId);
+            if (folderOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Folder folder = folderOpt.get();
+            
+            // Get all subfolders and filter by permissions
+            List<Folder> allSubFolders = folderRepository.findByParentFolderId(folderId);
+            List<Folder> viewableSubFolders = new ArrayList<>();
+            
+            for (Folder subFolder : allSubFolders) {
+                CheckPermissionRequest subFolderPermRequest = CheckPermissionRequest.newBuilder()
+                        .setResource(ObjectReference.newBuilder()
+                                .setObjectType("folder")
+                                .setObjectId(subFolder.getId().toString())
+                                .build())
+                        .setPermission("view")
+                        .setSubject(SubjectReference.newBuilder()
+                                .setObject(ObjectReference.newBuilder()
+                                        .setObjectType("user")
+                                        .setObjectId(username)
+                                        .build())
+                                .build())
+                        .build();
+
+                CheckPermissionResponse subFolderPermResponse = permClient.checkPermission(subFolderPermRequest);
+                if (subFolderPermResponse.getPermissionship() == CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                    viewableSubFolders.add(subFolder);
+                }
+            }
+            
+            // Get all documents and filter by permissions
+            List<Document> allDocuments = documentRepository.findByFolderId(folderId);
+            List<Document> viewableDocuments = new ArrayList<>();
+            
+            for (Document document : allDocuments) {
+                CheckPermissionRequest docPermRequest = CheckPermissionRequest.newBuilder()
+                        .setResource(ObjectReference.newBuilder()
+                                .setObjectType("document")
+                                .setObjectId(document.getId().toString())
+                                .build())
+                        .setPermission("view")
+                        .setSubject(SubjectReference.newBuilder()
+                                .setObject(ObjectReference.newBuilder()
+                                        .setObjectType("user")
+                                        .setObjectId(username)
+                                        .build())
+                                .build())
+                        .build();
+
+                CheckPermissionResponse docPermResponse = permClient.checkPermission(docPermRequest);
+                if (docPermResponse.getPermissionship() == CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                    viewableDocuments.add(document);
+                }
+            }
+
+            Map<String, Object> response = new java.util.HashMap<>();
+            response.put("folder", folder);
+            response.put("subFolders", viewableSubFolders);
+            response.put("documents", viewableDocuments);
+            response.put("parentFolderId", folder.getParentFolder() != null ? folder.getParentFolder().getId() : null);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
-
-        Folder folder = folderOpt.get();
-        List<Folder> subFolders = folderRepository.findByParentFolderIdAndViewer(folderId, username);
-        List<Document> documents = documentRepository.findByFolderIdAndViewer(folderId, username);
-
-        Map<String, Object> response = new java.util.HashMap<>();
-        response.put("folder", folder);
-        response.put("subFolders", subFolders);
-        response.put("documents", documents);
-        response.put("parentFolderId", folder.getParentFolder() != null ? folder.getParentFolder().getId() : null);
-
-        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/folders/root")
@@ -59,13 +176,6 @@ public class DocumentController {
         }
 
         Folder rootFolder = folderService.getRootFolder();
-        
-        // Add user as viewer if not already present
-        if (!rootFolder.getViewers().contains(username)) {
-            rootFolder.getViewers().add(username);
-            folderRepository.save(rootFolder);
-        }
-
         return getFolderContents(rootFolder.getId(), username);
     }
 
@@ -84,19 +194,90 @@ public class DocumentController {
             return ResponseEntity.badRequest().build();
         }
 
-        Folder parentFolder = null;
-        if (parentFolderId != null) {
-            Optional<Folder> parentOpt = folderRepository.findByIdAndViewer(parentFolderId, username);
-            if (parentOpt.isEmpty()) {
-                return ResponseEntity.notFound().build();
-            }
-            parentFolder = parentOpt.get();
-        } else {
-            parentFolder = folderService.getRootFolder();
-        }
+        try {
+            PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
+            
+            Folder parentFolder = null;
+            if (parentFolderId != null) {
+                // Check if user can create content in parent folder
+                CheckPermissionRequest parentPermRequest = CheckPermissionRequest.newBuilder()
+                        .setResource(ObjectReference.newBuilder()
+                                .setObjectType("folder")
+                                .setObjectId(parentFolderId.toString())
+                                .build())
+                        .setPermission("create_content")
+                        .setSubject(SubjectReference.newBuilder()
+                                .setObject(ObjectReference.newBuilder()
+                                        .setObjectType("user")
+                                        .setObjectId(username)
+                                        .build())
+                                .build())
+                        .build();
 
-        Folder newFolder = new Folder(name.trim(), username, parentFolder);
-        return ResponseEntity.ok(folderRepository.save(newFolder));
+                CheckPermissionResponse parentPermResponse = permClient.checkPermission(parentPermRequest);
+                if (parentPermResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                    return ResponseEntity.status(403).build();
+                }
+                
+                Optional<Folder> parentOpt = folderRepository.findById(parentFolderId);
+                if (parentOpt.isEmpty()) {
+                    return ResponseEntity.notFound().build();
+                }
+                parentFolder = parentOpt.get();
+            } else {
+                parentFolder = folderService.getRootFolder();
+                
+                // Check if user can create content in root folder
+                CheckPermissionRequest rootPermRequest = CheckPermissionRequest.newBuilder()
+                        .setResource(ObjectReference.newBuilder()
+                                .setObjectType("folder")
+                                .setObjectId(parentFolder.getId().toString())
+                                .build())
+                        .setPermission("create_content")
+                        .setSubject(SubjectReference.newBuilder()
+                                .setObject(ObjectReference.newBuilder()
+                                        .setObjectType("user")
+                                        .setObjectId(username)
+                                        .build())
+                                .build())
+                        .build();
+
+                CheckPermissionResponse rootPermResponse = permClient.checkPermission(rootPermRequest);
+                if (rootPermResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                    return ResponseEntity.status(403).build();
+                }
+            }
+
+            Folder newFolder = new Folder(name.trim(), parentFolder);
+            Folder savedFolder = folderRepository.save(newFolder);
+            
+            // Create ownership relationship in SpiceDB
+            WriteRelationshipsRequest writeRequest = WriteRelationshipsRequest.newBuilder()
+                    .addUpdates(RelationshipUpdate.newBuilder()
+                            .setOperation(RelationshipUpdate.Operation.OPERATION_CREATE)
+                            .setRelationship(Relationship.newBuilder()
+                                    .setResource(ObjectReference.newBuilder()
+                                            .setObjectType("folder")
+                                            .setObjectId(savedFolder.getId().toString())
+                                            .build())
+                                    .setRelation("owner")
+                                    .setSubject(SubjectReference.newBuilder()
+                                            .setObject(ObjectReference.newBuilder()
+                                                    .setObjectType("user")
+                                                    .setObjectId(username)
+                                                    .build())
+                                            .build())
+                                    .build())
+                            .build())
+                    .build();
+            
+            permClient.writeRelationships(writeRequest);
+            
+            return ResponseEntity.ok(savedFolder);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
     }
 
     // Document endpoints
@@ -116,19 +297,90 @@ public class DocumentController {
             return ResponseEntity.badRequest().build();
         }
 
-        Folder folder = null;
-        if (folderId != null) {
-            Optional<Folder> folderOpt = folderRepository.findByIdAndViewer(folderId, username);
-            if (folderOpt.isEmpty()) {
-                return ResponseEntity.notFound().build();
-            }
-            folder = folderOpt.get();
-        } else {
-            folder = folderService.getRootFolder();
-        }
+        try {
+            PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
+            
+            Folder folder = null;
+            if (folderId != null) {
+                // Check if user can create content in this folder
+                CheckPermissionRequest folderPermRequest = CheckPermissionRequest.newBuilder()
+                        .setResource(ObjectReference.newBuilder()
+                                .setObjectType("folder")
+                                .setObjectId(folderId.toString())
+                                .build())
+                        .setPermission("create_content")
+                        .setSubject(SubjectReference.newBuilder()
+                                .setObject(ObjectReference.newBuilder()
+                                        .setObjectType("user")
+                                        .setObjectId(username)
+                                        .build())
+                                .build())
+                        .build();
 
-        Document document = new Document(title.trim(), content != null ? content : "", username, folder);
-        return ResponseEntity.ok(documentRepository.save(document));
+                CheckPermissionResponse folderPermResponse = permClient.checkPermission(folderPermRequest);
+                if (folderPermResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                    return ResponseEntity.status(403).build();
+                }
+                
+                Optional<Folder> folderOpt = folderRepository.findById(folderId);
+                if (folderOpt.isEmpty()) {
+                    return ResponseEntity.notFound().build();
+                }
+                folder = folderOpt.get();
+            } else {
+                folder = folderService.getRootFolder();
+                
+                // Check if user can create content in root folder
+                CheckPermissionRequest rootPermRequest = CheckPermissionRequest.newBuilder()
+                        .setResource(ObjectReference.newBuilder()
+                                .setObjectType("folder")
+                                .setObjectId(folder.getId().toString())
+                                .build())
+                        .setPermission("create_content")
+                        .setSubject(SubjectReference.newBuilder()
+                                .setObject(ObjectReference.newBuilder()
+                                        .setObjectType("user")
+                                        .setObjectId(username)
+                                        .build())
+                                .build())
+                        .build();
+
+                CheckPermissionResponse rootPermResponse = permClient.checkPermission(rootPermRequest);
+                if (rootPermResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                    return ResponseEntity.status(403).build();
+                }
+            }
+
+            Document document = new Document(title.trim(), content != null ? content : "", folder);
+            Document savedDocument = documentRepository.save(document);
+            
+            // Create ownership relationship in SpiceDB
+            WriteRelationshipsRequest writeRequest = WriteRelationshipsRequest.newBuilder()
+                    .addUpdates(RelationshipUpdate.newBuilder()
+                            .setOperation(RelationshipUpdate.Operation.OPERATION_CREATE)
+                            .setRelationship(Relationship.newBuilder()
+                                    .setResource(ObjectReference.newBuilder()
+                                            .setObjectType("document")
+                                            .setObjectId(savedDocument.getId().toString())
+                                            .build())
+                                    .setRelation("owner")
+                                    .setSubject(SubjectReference.newBuilder()
+                                            .setObject(ObjectReference.newBuilder()
+                                                    .setObjectType("user")
+                                                    .setObjectId(username)
+                                                    .build())
+                                            .build())
+                                    .build())
+                            .build())
+                    .build();
+            
+            permClient.writeRelationships(writeRequest);
+            
+            return ResponseEntity.ok(savedDocument);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
     }
 
     @GetMapping("/documents/{id}")
@@ -138,11 +390,38 @@ public class DocumentController {
             return ResponseEntity.badRequest().build();
         }
 
-        Optional<Document> document = documentRepository.findByIdAndViewer(id, username);
-        if (document.isPresent()) {
-            return ResponseEntity.ok(document.get());
+        try {
+            PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
+            
+            // Check if user can view this document
+            CheckPermissionRequest permRequest = CheckPermissionRequest.newBuilder()
+                    .setResource(ObjectReference.newBuilder()
+                            .setObjectType("document")
+                            .setObjectId(id.toString())
+                            .build())
+                    .setPermission("view")
+                    .setSubject(SubjectReference.newBuilder()
+                            .setObject(ObjectReference.newBuilder()
+                                    .setObjectType("user")
+                                    .setObjectId(username)
+                                    .build())
+                            .build())
+                    .build();
+
+            CheckPermissionResponse permResponse = permClient.checkPermission(permRequest);
+            if (permResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                return ResponseEntity.status(403).build();
+            }
+
+            Optional<Document> document = documentRepository.findById(id);
+            if (document.isPresent()) {
+                return ResponseEntity.ok(document.get());
+            }
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
-        return ResponseEntity.notFound().build();
     }
 
     @PutMapping("/documents/{id}")
@@ -153,14 +432,41 @@ public class DocumentController {
             return ResponseEntity.badRequest().build();
         }
 
-        Optional<Document> existingDocument = documentRepository.findByIdAndViewer(id, username);
-        if (existingDocument.isPresent()) {
-            Document document = existingDocument.get();
-            document.setTitle(updatedDocument.getTitle());
-            document.setContent(updatedDocument.getContent());
-            return ResponseEntity.ok(documentRepository.save(document));
+        try {
+            PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
+            
+            // Check if user can edit this document
+            CheckPermissionRequest permRequest = CheckPermissionRequest.newBuilder()
+                    .setResource(ObjectReference.newBuilder()
+                            .setObjectType("document")
+                            .setObjectId(id.toString())
+                            .build())
+                    .setPermission("edit")
+                    .setSubject(SubjectReference.newBuilder()
+                            .setObject(ObjectReference.newBuilder()
+                                    .setObjectType("user")
+                                    .setObjectId(username)
+                                    .build())
+                            .build())
+                    .build();
+
+            CheckPermissionResponse permResponse = permClient.checkPermission(permRequest);
+            if (permResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                return ResponseEntity.status(403).build();
+            }
+
+            Optional<Document> existingDocument = documentRepository.findById(id);
+            if (existingDocument.isPresent()) {
+                Document document = existingDocument.get();
+                document.setTitle(updatedDocument.getTitle());
+                document.setContent(updatedDocument.getContent());
+                return ResponseEntity.ok(documentRepository.save(document));
+            }
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
-        return ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/documents/{id}")
@@ -170,12 +476,63 @@ public class DocumentController {
             return ResponseEntity.badRequest().build();
         }
 
-        Optional<Document> document = documentRepository.findByIdAndViewer(id, username);
-        if (document.isPresent()) {
-            documentRepository.deleteById(id);
-            return ResponseEntity.noContent().build();
+        try {
+            PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
+            
+            // Check if user can delete this document
+            CheckPermissionRequest permRequest = CheckPermissionRequest.newBuilder()
+                    .setResource(ObjectReference.newBuilder()
+                            .setObjectType("document")
+                            .setObjectId(id.toString())
+                            .build())
+                    .setPermission("delete")
+                    .setSubject(SubjectReference.newBuilder()
+                            .setObject(ObjectReference.newBuilder()
+                                    .setObjectType("user")
+                                    .setObjectId(username)
+                                    .build())
+                            .build())
+                    .build();
+
+            CheckPermissionResponse permResponse = permClient.checkPermission(permRequest);
+            if (permResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                return ResponseEntity.status(403).build();
+            }
+
+            Optional<Document> document = documentRepository.findById(id);
+            if (document.isPresent()) {
+                documentRepository.deleteById(id);
+                
+                // Clean up SpiceDB relationships for this document
+                ReadRelationshipsRequest readRequest = ReadRelationshipsRequest.newBuilder()
+                        .setRelationshipFilter(RelationshipFilter.newBuilder()
+                                .setResourceType("document")
+                                .setOptionalResourceId(id.toString())
+                                .build())
+                        .build();
+
+                WriteRelationshipsRequest.Builder writeRequestBuilder = WriteRelationshipsRequest.newBuilder();
+                
+                permClient.readRelationships(readRequest).forEachRemaining(response -> {
+                    Relationship rel = response.getRelationship();
+                    RelationshipUpdate update = RelationshipUpdate.newBuilder()
+                            .setOperation(RelationshipUpdate.Operation.OPERATION_DELETE)
+                            .setRelationship(rel)
+                            .build();
+                    writeRequestBuilder.addUpdates(update);
+                });
+                
+                if (writeRequestBuilder.getUpdatesCount() > 0) {
+                    permClient.writeRelationships(writeRequestBuilder.build());
+                }
+                
+                return ResponseEntity.noContent().build();
+            }
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
-        return ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/folders/{id}")
@@ -185,11 +542,284 @@ public class DocumentController {
             return ResponseEntity.badRequest().build();
         }
 
-        Optional<Folder> folder = folderRepository.findByIdAndViewer(id, username);
-        if (folder.isPresent() && !folder.get().getIsRoot()) {
-            folderRepository.deleteById(id);
-            return ResponseEntity.noContent().build();
+        try {
+            PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
+            
+            // Check if user can delete this folder
+            CheckPermissionRequest permRequest = CheckPermissionRequest.newBuilder()
+                    .setResource(ObjectReference.newBuilder()
+                            .setObjectType("folder")
+                            .setObjectId(id.toString())
+                            .build())
+                    .setPermission("delete")
+                    .setSubject(SubjectReference.newBuilder()
+                            .setObject(ObjectReference.newBuilder()
+                                    .setObjectType("user")
+                                    .setObjectId(username)
+                                    .build())
+                            .build())
+                    .build();
+
+            CheckPermissionResponse permResponse = permClient.checkPermission(permRequest);
+            if (permResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                return ResponseEntity.status(403).build();
+            }
+
+            Optional<Folder> folder = folderRepository.findById(id);
+            if (folder.isPresent() && !folder.get().getIsRoot()) {
+                folderRepository.deleteById(id);
+                
+                // Clean up SpiceDB relationships for this folder
+                ReadRelationshipsRequest readRequest = ReadRelationshipsRequest.newBuilder()
+                        .setRelationshipFilter(RelationshipFilter.newBuilder()
+                                .setResourceType("folder")
+                                .setOptionalResourceId(id.toString())
+                                .build())
+                        .build();
+
+                WriteRelationshipsRequest.Builder writeRequestBuilder = WriteRelationshipsRequest.newBuilder();
+                
+                permClient.readRelationships(readRequest).forEachRemaining(response -> {
+                    Relationship rel = response.getRelationship();
+                    RelationshipUpdate update = RelationshipUpdate.newBuilder()
+                            .setOperation(RelationshipUpdate.Operation.OPERATION_DELETE)
+                            .setRelationship(rel)
+                            .build();
+                    writeRequestBuilder.addUpdates(update);
+                });
+                
+                if (writeRequestBuilder.getUpdatesCount() > 0) {
+                    permClient.writeRelationships(writeRequestBuilder.build());
+                }
+                
+                return ResponseEntity.noContent().build();
+            }
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
-        return ResponseEntity.notFound().build();
+    }
+    
+    // Sharing endpoints
+    @GetMapping("/documents/{id}/shares")
+    public ResponseEntity<Map<String, Object>> getDocumentShares(@PathVariable UUID id,
+                                                               @RequestHeader(value = "X-Username", required = false) String username) {
+        if (username == null || username.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
+            
+            // Check if user can manage sharing for this document
+            CheckPermissionRequest permRequest = CheckPermissionRequest.newBuilder()
+                    .setResource(ObjectReference.newBuilder()
+                            .setObjectType("document")
+                            .setObjectId(id.toString())
+                            .build())
+                    .setPermission("manage_sharing")
+                    .setSubject(SubjectReference.newBuilder()
+                            .setObject(ObjectReference.newBuilder()
+                                    .setObjectType("user")
+                                    .setObjectId(username)
+                                    .build())
+                            .build())
+                    .build();
+
+            CheckPermissionResponse permResponse = permClient.checkPermission(permRequest);
+            if (permResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                return ResponseEntity.status(403).build();
+            }
+
+            // Read existing relationships for this document
+            ReadRelationshipsRequest readRequest = ReadRelationshipsRequest.newBuilder()
+                    .setRelationshipFilter(RelationshipFilter.newBuilder()
+                            .setResourceType("document")
+                            .setOptionalResourceId(id.toString())
+                            .build())
+                    .build();
+
+            List<Map<String, String>> shares = new ArrayList<>();
+            permClient.readRelationships(readRequest).forEachRemaining(response -> {
+                Relationship rel = response.getRelationship();
+                Map<String, String> share = new HashMap<>();
+                share.put("username", rel.getSubject().getObject().getObjectId());
+                share.put("role", rel.getRelation());
+                shares.add(share);
+            });
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("shares", shares);
+            result.put("resourceType", "document");
+            result.put("resourceId", id.toString());
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    @GetMapping("/folders/{id}/shares")
+    public ResponseEntity<Map<String, Object>> getFolderShares(@PathVariable UUID id,
+                                                             @RequestHeader(value = "X-Username", required = false) String username) {
+        if (username == null || username.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
+            
+            // Check if user can manage sharing for this folder
+            CheckPermissionRequest permRequest = CheckPermissionRequest.newBuilder()
+                    .setResource(ObjectReference.newBuilder()
+                            .setObjectType("folder")
+                            .setObjectId(id.toString())
+                            .build())
+                    .setPermission("manage_sharing")
+                    .setSubject(SubjectReference.newBuilder()
+                            .setObject(ObjectReference.newBuilder()
+                                    .setObjectType("user")
+                                    .setObjectId(username)
+                                    .build())
+                            .build())
+                    .build();
+
+            CheckPermissionResponse permResponse = permClient.checkPermission(permRequest);
+            if (permResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                return ResponseEntity.status(403).build();
+            }
+
+            // Read existing relationships for this folder
+            ReadRelationshipsRequest readRequest = ReadRelationshipsRequest.newBuilder()
+                    .setRelationshipFilter(RelationshipFilter.newBuilder()
+                            .setResourceType("folder")
+                            .setOptionalResourceId(id.toString())
+                            .build())
+                    .build();
+
+            List<Map<String, String>> shares = new ArrayList<>();
+            permClient.readRelationships(readRequest).forEachRemaining(response -> {
+                Relationship rel = response.getRelationship();
+                Map<String, String> share = new HashMap<>();
+                share.put("username", rel.getSubject().getObject().getObjectId());
+                share.put("role", rel.getRelation());
+                shares.add(share);
+            });
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("shares", shares);
+            result.put("resourceType", "folder");
+            result.put("resourceId", id.toString());
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    @PostMapping("/shares")
+    public ResponseEntity<Map<String, String>> updateShares(@RequestBody Map<String, Object> request,
+                                                           @RequestHeader(value = "X-Username", required = false) String username) {
+        if (username == null || username.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
+            String resourceType = (String) request.get("resourceType");
+            String resourceId = (String) request.get("resourceId");
+            @SuppressWarnings("unchecked")
+            List<Map<String, String>> toAdd = (List<Map<String, String>>) request.get("toAdd");
+            @SuppressWarnings("unchecked")
+            List<Map<String, String>> toRemove = (List<Map<String, String>>) request.get("toRemove");
+
+            // Check if user can manage sharing for this resource
+            CheckPermissionRequest permRequest = CheckPermissionRequest.newBuilder()
+                    .setResource(ObjectReference.newBuilder()
+                            .setObjectType(resourceType)
+                            .setObjectId(resourceId)
+                            .build())
+                    .setPermission("manage_sharing")
+                    .setSubject(SubjectReference.newBuilder()
+                            .setObject(ObjectReference.newBuilder()
+                                    .setObjectType("user")
+                                    .setObjectId(username)
+                                    .build())
+                            .build())
+                    .build();
+
+            CheckPermissionResponse permResponse = permClient.checkPermission(permRequest);
+            if (permResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
+                return ResponseEntity.status(403).build();
+            }
+
+            // Build write request with updates
+            WriteRelationshipsRequest.Builder writeRequestBuilder = WriteRelationshipsRequest.newBuilder();
+
+            // Add new relationships
+            if (toAdd != null) {
+                for (Map<String, String> share : toAdd) {
+                    String shareUsername = share.get("username");
+                    String role = share.get("role");
+                    
+                    RelationshipUpdate update = RelationshipUpdate.newBuilder()
+                            .setOperation(RelationshipUpdate.Operation.OPERATION_CREATE)
+                            .setRelationship(Relationship.newBuilder()
+                                    .setResource(ObjectReference.newBuilder()
+                                            .setObjectType(resourceType)
+                                            .setObjectId(resourceId)
+                                            .build())
+                                    .setRelation(role)
+                                    .setSubject(SubjectReference.newBuilder()
+                                            .setObject(ObjectReference.newBuilder()
+                                                    .setObjectType("user")
+                                                    .setObjectId(shareUsername)
+                                                    .build())
+                                            .build())
+                                    .build())
+                            .build();
+                    writeRequestBuilder.addUpdates(update);
+                }
+            }
+
+            // Remove relationships
+            if (toRemove != null) {
+                for (Map<String, String> share : toRemove) {
+                    String shareUsername = share.get("username");
+                    String role = share.get("role");
+                    
+                    RelationshipUpdate update = RelationshipUpdate.newBuilder()
+                            .setOperation(RelationshipUpdate.Operation.OPERATION_DELETE)
+                            .setRelationship(Relationship.newBuilder()
+                                    .setResource(ObjectReference.newBuilder()
+                                            .setObjectType(resourceType)
+                                            .setObjectId(resourceId)
+                                            .build())
+                                    .setRelation(role)
+                                    .setSubject(SubjectReference.newBuilder()
+                                            .setObject(ObjectReference.newBuilder()
+                                                    .setObjectType("user")
+                                                    .setObjectId(shareUsername)
+                                                    .build())
+                                            .build())
+                                    .build())
+                            .build();
+                    writeRequestBuilder.addUpdates(update);
+                }
+            }
+
+            // Execute the write request if there are updates
+            if (writeRequestBuilder.getUpdatesCount() > 0) {
+                permClient.writeRelationships(writeRequestBuilder.build());
+            }
+
+            return ResponseEntity.ok(Map.of("status", "success"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
     }
 }
