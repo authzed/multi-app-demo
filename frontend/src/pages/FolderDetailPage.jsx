@@ -408,7 +408,16 @@ function FolderDetailPage({ currentUser }) {
                         <td style={{ padding: '12px 8px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ fontSize: '16px' }}>📄</span>
-                            <span>{doc.title}</span>
+                            <span 
+                              style={{ 
+                                color: '#007bff', 
+                                cursor: 'pointer',
+                                textDecoration: 'underline'
+                              }}
+                              onClick={() => navigate(`/docs/document/${doc.id}`)}
+                            >
+                              {doc.title}
+                            </span>
                           </div>
                         </td>
                         <td style={{ padding: '12px 8px', color: '#666' }}>
