@@ -4,7 +4,7 @@ import { WiredCard, WiredButton, WiredInput, WiredCombo, WiredItem } from 'wired
 import './PageLayout.css'
 
 function GroupDetailPage({ currentUser }) {
-  const { id } = useParams()
+  const { username } = useParams()
   const navigate = useNavigate()
   const [group, setGroup] = useState(null)
   const [members, setMembers] = useState([])
@@ -22,7 +22,7 @@ function GroupDetailPage({ currentUser }) {
         }
       })
       const groups = await response.json()
-      const groupDetail = groups.find(g => g.id === parseInt(id))
+      const groupDetail = groups.find(g => g.username === username)
       
       if (groupDetail) {
         setGroup(groupDetail)
@@ -35,11 +35,11 @@ function GroupDetailPage({ currentUser }) {
     } finally {
       setLoading(false)
     }
-  }, [id, currentUser.username])
+  }, [username, currentUser.username])
 
   const fetchGroupMembers = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:3001/groups/${id}/members`, {
+      const response = await fetch(`http://localhost:3001/groups/${username}/members`, {
         headers: {
           'X-Username': currentUser.username
         }
@@ -59,7 +59,7 @@ function GroupDetailPage({ currentUser }) {
     } catch (error) {
       console.error('Error fetching group members:', error)
     }
-  }, [id, currentUser.username])
+  }, [username, currentUser.username])
 
   useEffect(() => {
     fetchGroupDetails()
@@ -70,7 +70,7 @@ function GroupDetailPage({ currentUser }) {
     if (!newMemberUsername.trim()) return
 
     try {
-      const response = await fetch(`http://localhost:3001/groups/${id}/members`, {
+      const response = await fetch(`http://localhost:3001/groups/${username}/members`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -101,13 +101,13 @@ function GroupDetailPage({ currentUser }) {
     }
   }
 
-  const removeMember = async (username) => {
-    if (!window.confirm(`Are you sure you want to remove ${username} from the group?`)) {
+  const removeMember = async (memberUsername) => {
+    if (!window.confirm(`Are you sure you want to remove ${memberUsername} from the group?`)) {
       return
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/groups/${id}/members/${username}`, {
+      const response = await fetch(`http://localhost:3001/groups/${username}/members/${memberUsername}`, {
         method: 'DELETE',
         headers: {
           'X-Username': currentUser.username
@@ -133,7 +133,7 @@ function GroupDetailPage({ currentUser }) {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/groups/${id}`, {
+      const response = await fetch(`http://localhost:3001/groups/${username}`, {
         method: 'DELETE',
         headers: {
           'X-Username': currentUser.username

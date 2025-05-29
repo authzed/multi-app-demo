@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
 import './PageLayout.css'
@@ -9,14 +9,10 @@ function GroupsPage({ currentUser }) {
   const [newGroup, setNewGroup] = useState({
     name: '',
     description: '',
-    email: ''
+    username: ''
   })
 
-  useEffect(() => {
-    fetchGroups()
-  }, [currentUser.username])
-
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
     try {
       const response = await fetch('http://localhost:3001/groups', {
         headers: {
@@ -28,14 +24,14 @@ function GroupsPage({ currentUser }) {
     } catch (error) {
       console.error('Error fetching groups:', error)
     }
-  }
+  }, [currentUser.username])
+
+  useEffect(() => {
+    fetchGroups()
+  }, [fetchGroups])
 
   const createGroup = async () => {
-    if (!newGroup.name.trim()) return
-
-    // Generate default email if not provided
-    const emailToUse = newGroup.email.trim() || 
-      `${newGroup.name.toLowerCase().replace(/\s+/g, '-')}@company.com`
+    if (!newGroup.name.trim() || !newGroup.username.trim()) return
 
     try {
       const response = await fetch('http://localhost:3001/groups', {
@@ -47,26 +43,33 @@ function GroupsPage({ currentUser }) {
         body: JSON.stringify({ 
           name: newGroup.name,
           description: newGroup.description || `A group for ${newGroup.name} discussions`,
-          email: emailToUse,
+          username: newGroup.username,
           visibility: 'PUBLIC',
           owner_username: currentUser.username
         })
       })
-      const createdGroup = await response.json()
-      setGroups([createdGroup, ...groups])
-      setNewGroup({ name: '', description: '', email: '' })
+      
+      if (response.ok) {
+        const createdGroup = await response.json()
+        setGroups([createdGroup, ...groups])
+        setNewGroup({ name: '', description: '', username: '' })
+      } else {
+        const error = await response.json()
+        alert(`Failed to create group: ${error.error || 'Unknown error'}`)
+      }
     } catch (error) {
       console.error('Error creating group:', error)
+      alert('Failed to create group. Please try again.')
     }
   }
 
-  const deleteGroup = async (groupId, groupName) => {
+  const deleteGroup = async (groupUsername, groupName) => {
     if (!window.confirm(`Are you sure you want to delete "${groupName}"? This action cannot be undone.`)) {
       return
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/groups/${groupId}`, {
+      const response = await fetch(`http://localhost:3001/groups/${groupUsername}`, {
         method: 'DELETE',
         headers: {
           'X-Username': currentUser.username
@@ -74,7 +77,7 @@ function GroupsPage({ currentUser }) {
       })
       
       if (response.ok) {
-        setGroups(groups.filter(group => group.id !== groupId))
+        setGroups(groups.filter(group => group.username !== groupUsername))
       } else {
         const error = await response.json()
         alert(`Failed to delete group: ${error.error || 'Unknown error'}`)
@@ -106,9 +109,9 @@ function GroupsPage({ currentUser }) {
             <div className="form-row">
               <WiredInput 
                 className="form-input"
-                placeholder="Group email (optional, will auto-generate if empty)"
-                value={newGroup.email}
-                onChange={(e) => setNewGroup({...newGroup, email: e.target.value})}
+                placeholder="Group username (required, will be used for email as username@company.com)"
+                value={newGroup.username}
+                onChange={(e) => setNewGroup({...newGroup, username: e.target.value})}
               />
             </div>
             <div className="form-row">
@@ -131,11 +134,11 @@ function GroupsPage({ currentUser }) {
             <h3>Existing Groups</h3>
             <div className="items-grid">
               {groups.map(group => (
-                <WiredCard key={group.id} className="item-card">
+                <WiredCard key={group.username} className="item-card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                     <div 
                       style={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/groups/${group.id}`)}
+                      onClick={() => navigate(`/groups/${group.username}`)}
                     >
                       <strong style={{ color: '#007bff', textDecoration: 'underline' }}>
                         {group.name}
@@ -148,7 +151,7 @@ function GroupsPage({ currentUser }) {
                         background: '#ff4444',
                         color: 'white'
                       }}
-                      onClick={() => deleteGroup(group.id, group.name)}
+                      onClick={() => deleteGroup(group.username, group.name)}
                     >
                       Delete
                     </WiredButton>

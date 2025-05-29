@@ -40,7 +40,7 @@ function App() {
         <main className="main-content">
           <Routes key={currentUser.id}>
             <Route path="/groups" element={<GroupsPage currentUser={currentUser} />} />
-            <Route path="/groups/:id" element={<GroupDetailPage currentUser={currentUser} />} />
+            <Route path="/groups/:username" element={<GroupDetailPage currentUser={currentUser} />} />
             <Route path="/mail" element={<MailPage currentUser={currentUser} />} />
             <Route path="/docs" element={<FolderDetailPage currentUser={currentUser} />} />
             <Route path="/docs/folder/:folderId" element={<FolderDetailPage currentUser={currentUser} />} />

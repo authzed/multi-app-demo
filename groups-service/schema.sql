@@ -1,30 +1,29 @@
 -- Groups service database schema
 
--- Groups table (without fixed ownership)
+-- Groups table (using username as primary key)
 CREATE TABLE IF NOT EXISTS groups (
-    id SERIAL PRIMARY KEY,
+    username VARCHAR(100) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    email VARCHAR(255) UNIQUE NOT NULL,
     visibility VARCHAR(50) DEFAULT 'PUBLIC' CHECK (visibility IN ('PUBLIC', 'PRIVATE', 'RESTRICTED')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Group memberships table (using usernames instead of user IDs)
+-- Group memberships table (using group username)
 CREATE TABLE IF NOT EXISTS group_memberships (
     id SERIAL PRIMARY KEY,
-    group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+    group_username VARCHAR(100) REFERENCES groups(username) ON DELETE CASCADE,
     username VARCHAR(100) NOT NULL,
     role VARCHAR(50) DEFAULT 'MEMBER' CHECK (role IN ('OWNER', 'MANAGER', 'MEMBER')),
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(group_id, username)
+    UNIQUE(group_username, username)
 );
 
--- Messages table for group discussions (using usernames)
+-- Messages table for group discussions (using group username)
 CREATE TABLE IF NOT EXISTS messages (
     id SERIAL PRIMARY KEY,
-    group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+    group_username VARCHAR(100) REFERENCES groups(username) ON DELETE CASCADE,
     sender_username VARCHAR(100) NOT NULL,
     subject VARCHAR(500),
     body TEXT NOT NULL,
@@ -32,23 +31,23 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 -- Indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_group_memberships_group_id ON group_memberships(group_id);
+CREATE INDEX IF NOT EXISTS idx_group_memberships_group_username ON group_memberships(group_username);
 CREATE INDEX IF NOT EXISTS idx_group_memberships_username ON group_memberships(username);
 CREATE INDEX IF NOT EXISTS idx_group_memberships_role ON group_memberships(role);
-CREATE INDEX IF NOT EXISTS idx_messages_group_id ON messages(group_id);
+CREATE INDEX IF NOT EXISTS idx_messages_group_username ON messages(group_username);
 CREATE INDEX IF NOT EXISTS idx_messages_sender_username ON messages(sender_username);
 
 -- Insert some sample data
-INSERT INTO groups (name, description, email) VALUES 
-    ('Engineering Team', 'Software engineering discussions and updates', 'engineering@company.com'),
-    ('Product Team', 'Product management and roadmap discussions', 'product@company.com')
-ON CONFLICT (email) DO NOTHING;
+INSERT INTO groups (username, name, description) VALUES 
+    ('engineering', 'Engineering Team', 'Software engineering discussions and updates'),
+    ('product', 'Product Team', 'Product management and roadmap discussions')
+ON CONFLICT (username) DO NOTHING;
 
-INSERT INTO group_memberships (group_id, username, role) VALUES 
-    (1, 'achen', 'OWNER'),
-    (1, 'jrivera', 'MEMBER'),
-    (1, 'tkim', 'MEMBER'),
-    (2, 'achen', 'OWNER'),
-    (2, 'cmorgan', 'MEMBER'),
-    (2, 'rthompson', 'MEMBER')
-ON CONFLICT (group_id, username) DO NOTHING;
+INSERT INTO group_memberships (group_username, username, role) VALUES 
+    ('engineering', 'achen', 'OWNER'),
+    ('engineering', 'jrivera', 'MEMBER'),
+    ('engineering', 'tkim', 'MEMBER'),
+    ('product', 'achen', 'OWNER'),
+    ('product', 'cmorgan', 'MEMBER'),
+    ('product', 'rthompson', 'MEMBER')
+ON CONFLICT (group_username, username) DO NOTHING;
