@@ -378,51 +378,40 @@ public class DocumentController {
         try {
             PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
             
-            // Check if user can view this document
-            CheckPermissionRequest permRequest = CheckPermissionRequest.newBuilder()
-                    .setResource(ObjectReference.newBuilder()
-                            .setObjectType("document")
-                            .setObjectId(id.toString())
-                            .build())
-                    .setPermission("view")
-                    .setSubject(SubjectReference.newBuilder()
-                            .setObject(ObjectReference.newBuilder()
-                                    .setObjectType("user")
-                                    .setObjectId(username)
-                                    .build())
-                            .build())
-                    .build();
-
+            // First get the document to access its zedtoken
+            Optional<Document> documentOpt = documentRepository.findByIdWithFolder(id);
+            if (!documentOpt.isPresent()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            Document document = documentOpt.get();
+            
+            // Check if user can view this document with zedtoken consistency
+            CheckPermissionRequest permRequest = buildPermissionCheckWithZedtoken("document", id.toString(), "view", username, document.getZedtoken());
             CheckPermissionResponse permResponse = permClient.checkPermission(permRequest);
             if (permResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
                 return ResponseEntity.status(403).build();
             }
 
-            Optional<Document> documentOpt = documentRepository.findByIdWithFolder(id);
-            if (documentOpt.isPresent()) {
-                Document document = documentOpt.get();
-                
-                // Read owner relationships from SpiceDB
-                ReadRelationshipsRequest readRequest = ReadRelationshipsRequest.newBuilder()
-                        .setRelationshipFilter(RelationshipFilter.newBuilder()
-                                .setResourceType("document")
-                                .setOptionalResourceId(id.toString())
-                                .setOptionalRelation("owner")
-                                .build())
-                        .build();
+            // Read owner relationships from SpiceDB
+            ReadRelationshipsRequest readRequest = ReadRelationshipsRequest.newBuilder()
+                    .setRelationshipFilter(RelationshipFilter.newBuilder()
+                            .setResourceType("document")
+                            .setOptionalResourceId(id.toString())
+                            .setOptionalRelation("owner")
+                            .build())
+                    .build();
 
-                List<String> owners = new ArrayList<>();
-                permClient.readRelationships(readRequest).forEachRemaining(response -> {
-                    Relationship rel = response.getRelationship();
-                    if ("owner".equals(rel.getRelation())) {
-                        owners.add(rel.getSubject().getObject().getObjectId());
-                    }
-                });
-                
-                document.setOwners(owners);
-                return ResponseEntity.ok(document);
-            }
-            return ResponseEntity.notFound().build();
+            List<String> owners = new ArrayList<>();
+            permClient.readRelationships(readRequest).forEachRemaining(response -> {
+                Relationship rel = response.getRelationship();
+                if ("owner".equals(rel.getRelation())) {
+                    owners.add(rel.getSubject().getObject().getObjectId());
+                }
+            });
+            
+            document.setOwners(owners);
+            return ResponseEntity.ok(document);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).build();
@@ -440,34 +429,25 @@ public class DocumentController {
         try {
             PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
             
-            // Check if user can edit this document
-            CheckPermissionRequest permRequest = CheckPermissionRequest.newBuilder()
-                    .setResource(ObjectReference.newBuilder()
-                            .setObjectType("document")
-                            .setObjectId(id.toString())
-                            .build())
-                    .setPermission("edit")
-                    .setSubject(SubjectReference.newBuilder()
-                            .setObject(ObjectReference.newBuilder()
-                                    .setObjectType("user")
-                                    .setObjectId(username)
-                                    .build())
-                            .build())
-                    .build();
-
+            // First get the document to access its zedtoken
+            Optional<Document> existingDocument = documentRepository.findByIdWithFolder(id);
+            if (!existingDocument.isPresent()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            Document document = existingDocument.get();
+            
+            // Check if user can edit this document with zedtoken consistency
+            CheckPermissionRequest permRequest = buildPermissionCheckWithZedtoken("document", id.toString(), "edit", username, document.getZedtoken());
             CheckPermissionResponse permResponse = permClient.checkPermission(permRequest);
             if (permResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
                 return ResponseEntity.status(403).build();
             }
 
-            Optional<Document> existingDocument = documentRepository.findByIdWithFolder(id);
-            if (existingDocument.isPresent()) {
-                Document document = existingDocument.get();
-                document.setTitle(updatedDocument.getTitle());
-                document.setContent(updatedDocument.getContent());
-                return ResponseEntity.ok(documentRepository.save(document));
-            }
-            return ResponseEntity.notFound().build();
+            // Document was already retrieved above
+            document.setTitle(updatedDocument.getTitle());
+            document.setContent(updatedDocument.getContent());
+            return ResponseEntity.ok(documentRepository.save(document));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).build();
@@ -484,56 +464,48 @@ public class DocumentController {
         try {
             PermissionsServiceGrpc.PermissionsServiceBlockingStub permClient = getPermissionsClient();
             
-            // Check if user can delete this document
-            CheckPermissionRequest permRequest = CheckPermissionRequest.newBuilder()
-                    .setResource(ObjectReference.newBuilder()
-                            .setObjectType("document")
-                            .setObjectId(id.toString())
-                            .build())
-                    .setPermission("delete")
-                    .setSubject(SubjectReference.newBuilder()
-                            .setObject(ObjectReference.newBuilder()
-                                    .setObjectType("user")
-                                    .setObjectId(username)
-                                    .build())
-                            .build())
-                    .build();
-
+            // First get the document to access its zedtoken
+            Optional<Document> documentOpt = documentRepository.findByIdWithFolder(id);
+            if (!documentOpt.isPresent()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            Document document = documentOpt.get();
+            
+            // Check if user can delete this document with zedtoken consistency
+            CheckPermissionRequest permRequest = buildPermissionCheckWithZedtoken("document", id.toString(), "delete", username, document.getZedtoken());
             CheckPermissionResponse permResponse = permClient.checkPermission(permRequest);
             if (permResponse.getPermissionship() != CheckPermissionResponse.Permissionship.PERMISSIONSHIP_HAS_PERMISSION) {
                 return ResponseEntity.status(403).build();
             }
 
-            Optional<Document> document = documentRepository.findByIdWithFolder(id);
-            if (document.isPresent()) {
-                documentRepository.deleteById(id);
-                
-                // Clean up SpiceDB relationships for this document
-                ReadRelationshipsRequest readRequest = ReadRelationshipsRequest.newBuilder()
-                        .setRelationshipFilter(RelationshipFilter.newBuilder()
-                                .setResourceType("document")
-                                .setOptionalResourceId(id.toString())
-                                .build())
-                        .build();
+            // Document was already retrieved above
+            documentRepository.deleteById(id);
+            
+            // Clean up SpiceDB relationships for this document
+            ReadRelationshipsRequest readRequest = ReadRelationshipsRequest.newBuilder()
+                    .setRelationshipFilter(RelationshipFilter.newBuilder()
+                            .setResourceType("document")
+                            .setOptionalResourceId(id.toString())
+                            .build())
+                    .build();
 
-                WriteRelationshipsRequest.Builder writeRequestBuilder = WriteRelationshipsRequest.newBuilder();
-                
-                permClient.readRelationships(readRequest).forEachRemaining(response -> {
-                    Relationship rel = response.getRelationship();
-                    RelationshipUpdate update = RelationshipUpdate.newBuilder()
-                            .setOperation(RelationshipUpdate.Operation.OPERATION_DELETE)
-                            .setRelationship(rel)
-                            .build();
-                    writeRequestBuilder.addUpdates(update);
-                });
-                
-                if (writeRequestBuilder.getUpdatesCount() > 0) {
-                    permClient.writeRelationships(writeRequestBuilder.build());
-                }
-                
-                return ResponseEntity.noContent().build();
+            WriteRelationshipsRequest.Builder writeRequestBuilder = WriteRelationshipsRequest.newBuilder();
+            
+            permClient.readRelationships(readRequest).forEachRemaining(response -> {
+                Relationship rel = response.getRelationship();
+                RelationshipUpdate update = RelationshipUpdate.newBuilder()
+                        .setOperation(RelationshipUpdate.Operation.OPERATION_DELETE)
+                        .setRelationship(rel)
+                        .build();
+                writeRequestBuilder.addUpdates(update);
+            });
+            
+            if (writeRequestBuilder.getUpdatesCount() > 0) {
+                permClient.writeRelationships(writeRequestBuilder.build());
             }
-            return ResponseEntity.notFound().build();
+            
+            return ResponseEntity.noContent().build();
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).build();
