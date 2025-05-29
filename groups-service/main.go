@@ -38,10 +38,26 @@ type CreateGroupRequest struct {
 	OwnerUsername string `json:"owner_username" binding:"required"`
 }
 
+type User struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	Color    string `json:"color"`
+}
+
 var (
 	db            *sql.DB
 	spicedbClient *authzed.Client
 )
+
+// Hardcoded users list - source of truth for all users in the system
+var systemUsers = []User{
+	{ID: 1, Name: "Alex Chen", Username: "achen", Color: "#e74c3c"},
+	{ID: 2, Name: "Jordan Rivera", Username: "jrivera", Color: "#3498db"},
+	{ID: 3, Name: "Taylor Kim", Username: "tkim", Color: "#2ecc71"},
+	{ID: 4, Name: "Casey Morgan", Username: "cmorgan", Color: "#f39c12"},
+	{ID: 5, Name: "Riley Thompson", Username: "rthompson", Color: "#9b59b6"},
+}
 
 func initSpiceDB() {
 	spicedbEndpoint := os.Getenv("SPICEDB_ENDPOINT")
@@ -475,6 +491,41 @@ func getGroupOwners(groupUsername string) ([]string, error) {
 	return owners, nil
 }
 
+// Helper function to check if a username is taken by a system user
+func isSystemUser(username string) bool {
+	for _, user := range systemUsers {
+		if user.Username == username {
+			return true
+		}
+	}
+	return false
+}
+
+// Helper function to validate that a username doesn't conflict with existing groups or users
+func validateUsername(username string) error {
+	// Check if it conflicts with system users
+	if isSystemUser(username) {
+		return fmt.Errorf("username '%s' conflicts with an existing user", username)
+	}
+
+	// Check if it conflicts with existing groups
+	var exists bool
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE username = $1)", username).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check existing groups: %v", err)
+	}
+	if exists {
+		return fmt.Errorf("username '%s' conflicts with an existing group", username)
+	}
+
+	return nil
+}
+
+// Public API endpoint to get all system users
+func getUsers(c *gin.Context) {
+	c.JSON(http.StatusOK, systemUsers)
+}
+
 func createGroup(c *gin.Context) {
 	var req CreateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -487,20 +538,20 @@ func createGroup(c *gin.Context) {
 		req.Visibility = "PUBLIC"
 	}
 
-	// Check if group username already exists
-	var exists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE username = $1)", req.Username).Scan(&exists)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check group username"})
+	// Validate username doesn't conflict with users or existing groups
+	if err := validateUsername(req.Username); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	}
-	if exists {
-		c.JSON(http.StatusConflict, gin.H{"error": "Group username already exists"})
+
+	// Validate that the owner is a valid system user
+	if !isSystemUser(req.OwnerUsername) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Owner username '%s' is not a valid system user", req.OwnerUsername)})
 		return
 	}
 
 	// Insert the group
-	_, err = db.Exec(`
+	_, err := db.Exec(`
 		INSERT INTO groups (username, name, description, visibility) 
 		VALUES ($1, $2, $3, $4)
 	`, req.Username, req.Name, req.Description, req.Visibility)
@@ -622,6 +673,12 @@ func addGroupMember(c *gin.Context) {
 	// Validate role
 	if req.Role != "OWNER" && req.Role != "MANAGER" && req.Role != "MEMBER" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Must be OWNER, MANAGER, or MEMBER"})
+		return
+	}
+
+	// Validate that the user being added is a valid system user
+	if !isSystemUser(req.Username) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Username '%s' is not a valid system user", req.Username)})
 		return
 	}
 
@@ -757,6 +814,9 @@ func main() {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "groups"})
 	})
+
+	// Public API endpoints
+	r.GET("/api/users", getUsers)
 
 	r.GET("/groups", getGroups)
 	r.POST("/groups", createGroup)

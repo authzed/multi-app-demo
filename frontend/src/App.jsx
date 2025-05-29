@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Header from './components/Header'
 import GroupsPage from './pages/GroupsPage'
 import GroupDetailPage from './pages/GroupDetailPage'
@@ -8,29 +8,65 @@ import FolderDetailPage from './pages/FolderDetailPage'
 import DocumentEditPage from './pages/DocumentEditPage'
 import './App.css'
 
-const users = [
-  { id: 1, name: 'Alex Chen', username: 'achen', color: '#e74c3c' },
-  { id: 2, name: 'Jordan Rivera', username: 'jrivera', color: '#3498db' },
-  { id: 3, name: 'Taylor Kim', username: 'tkim', color: '#2ecc71' },
-  { id: 4, name: 'Casey Morgan', username: 'cmorgan', color: '#f39c12' },
-  { id: 5, name: 'Riley Thompson', username: 'rthompson', color: '#9b59b6' }
-]
-
 function App() {
-  const [currentUser, setCurrentUser] = useState(() => {
-    // Initialize from localStorage or default to first user
-    const savedUserId = localStorage.getItem('selectedUserId')
-    if (savedUserId) {
-      const savedUser = users.find(user => user.id === parseInt(savedUserId))
-      return savedUser || users[0]
+  const [users, setUsers] = useState([])
+  const [currentUser, setCurrentUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/users')
+      const userData = await response.json()
+      setUsers(userData)
+      
+      // Initialize current user from localStorage or default to first user
+      const savedUserId = localStorage.getItem('selectedUserId')
+      if (savedUserId) {
+        const savedUser = userData.find(user => user.id === parseInt(savedUserId))
+        setCurrentUser(savedUser || userData[0])
+      } else {
+        setCurrentUser(userData[0])
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error)
+      // Fallback to empty state
+      setUsers([])
+      setCurrentUser(null)
+    } finally {
+      setLoading(false)
     }
-    return users[0]
-  })
+  }, [])
+
+  useEffect(() => {
+    fetchUsers()
+  }, [fetchUsers])
 
   // Save to localStorage whenever user changes
   useEffect(() => {
-    localStorage.setItem('selectedUserId', currentUser.id.toString())
+    if (currentUser) {
+      localStorage.setItem('selectedUserId', currentUser.id.toString())
+    }
   }, [currentUser])
+
+  if (loading) {
+    return (
+      <div className="app">
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    )
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="app">
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          <h2>Failed to load users</h2>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <Router>
