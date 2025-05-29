@@ -8,6 +8,7 @@ function GroupDetailPage({ currentUser }) {
   const navigate = useNavigate()
   const [group, setGroup] = useState(null)
   const [members, setMembers] = useState([])
+  const [users, setUsers] = useState([])
   const [newMemberUsername, setNewMemberUsername] = useState('')
   const [newMemberRole, setNewMemberRole] = useState('MEMBER')
   const [loading, setLoading] = useState(true)
@@ -61,10 +62,21 @@ function GroupDetailPage({ currentUser }) {
     }
   }, [username, currentUser.username])
 
+  const fetchUsers = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/users')
+      const userData = await response.json()
+      setUsers(userData)
+    } catch (error) {
+      console.error('Error fetching users:', error)
+    }
+  }, [])
+
   useEffect(() => {
     fetchGroupDetails()
     fetchGroupMembers()
-  }, [fetchGroupDetails, fetchGroupMembers])
+    fetchUsers()
+  }, [fetchGroupDetails, fetchGroupMembers, fetchUsers])
 
   const addMember = async () => {
     if (!newMemberUsername.trim()) return
@@ -223,12 +235,21 @@ function GroupDetailPage({ currentUser }) {
             <WiredCard className="form-section">
               <h3>Add Member</h3>
               <div className="form-row">
-                <WiredInput 
+                <WiredCombo
+                  selected={newMemberUsername}
+                  onselected={(e) => {setNewMemberUsername(e.detail.selected)}}
                   className="form-input"
-                  placeholder="Username"
-                  value={newMemberUsername}
-                  onChange={(e) => setNewMemberUsername(e.target.value)}
-                />
+                >
+                  <WiredItem value="" disabled>Select a user...</WiredItem>
+                  {users
+                    .filter(user => !members.some(member => member.username === user.username))
+                    .map(user => (
+                      <WiredItem key={user.username} value={user.username}>
+                        {user.name} ({user.username})
+                      </WiredItem>
+                    ))
+                  }
+                </WiredCombo>
                 <WiredCombo
                   selected={newMemberRole}
                   onselected={(e) => {setNewMemberRole(e.detail.selected)}}
