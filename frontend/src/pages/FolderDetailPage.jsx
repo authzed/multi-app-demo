@@ -112,7 +112,7 @@ function FolderDetailPage({ currentUser }) {
     }
   }
 
-  const deleteDocument = async (docId, docTitle) => {
+  const _deleteDocument = async (docId, docTitle) => {
     if (!window.confirm(`Are you sure you want to delete "${docTitle}"?`)) {
       return
     }
