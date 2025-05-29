@@ -109,29 +109,25 @@ func initSpiceDB() {
 func initializeTestData() {
 	log.Println("Initializing SpiceDB test data...")
 
-	// Create some test relationships for existing groups
-	rows, err := db.Query(`
-		SELECT g.username, gm.username, gm.role 
-		FROM groups g 
-		JOIN group_memberships gm ON g.username = gm.group_username
-	`)
-	if err != nil {
-		log.Printf("Failed to fetch existing groups for SpiceDB init: %v", err)
-		return
+	// Create hardcoded test relationships for sample groups
+	// This replaces the previous database-driven initialization
+	testMemberships := []struct {
+		groupUsername string
+		username      string
+		role          string
+	}{
+		{"engineering", "achen", "OWNER"},
+		{"engineering", "jrivera", "MEMBER"},
+		{"engineering", "tkim", "MEMBER"},
+		{"product", "achen", "OWNER"},
+		{"product", "cmorgan", "MEMBER"},
+		{"product", "rthompson", "MEMBER"},
 	}
-	defer rows.Close()
 
 	var updates []*v1.RelationshipUpdate
-	for rows.Next() {
-		var groupUsername, username, role string
-		err := rows.Scan(&groupUsername, &username, &role)
-		if err != nil {
-			log.Printf("Failed to scan group membership: %v", err)
-			continue
-		}
-
+	for _, membership := range testMemberships {
 		var relation string
-		switch role {
+		switch membership.role {
 		case "OWNER", "MANAGER":
 			relation = "admin"
 		case "MEMBER":
@@ -145,13 +141,13 @@ func initializeTestData() {
 			Relationship: &v1.Relationship{
 				Resource: &v1.ObjectReference{
 					ObjectType: "group",
-					ObjectId:   groupUsername,
+					ObjectId:   membership.groupUsername,
 				},
 				Relation: relation,
 				Subject: &v1.SubjectReference{
 					Object: &v1.ObjectReference{
 						ObjectType: "user",
-						ObjectId:   username,
+						ObjectId:   membership.username,
 					},
 				},
 			},
@@ -451,8 +447,8 @@ func getGroups(c *gin.Context) {
 		group.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
 		group.Email = fmt.Sprintf("%s@company.com", group.Username)
 
-		// Fetch owners for this group
-		owners, err := getGroupOwners(group.Username)
+		// Fetch owners for this group from SpiceDB
+		owners, err := getGroupOwnersFromSpiceDB(group.Username)
 		if err != nil {
 			log.Printf("Failed to fetch owners for group %s: %v", group.Username, err)
 			group.Owners = []string{}
@@ -466,30 +462,6 @@ func getGroups(c *gin.Context) {
 	c.JSON(http.StatusOK, groups)
 }
 
-func getGroupOwners(groupUsername string) ([]string, error) {
-	rows, err := db.Query(`
-		SELECT username 
-		FROM group_memberships 
-		WHERE group_username = $1 AND role = 'OWNER'
-		ORDER BY username
-	`, groupUsername)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var owners []string
-	for rows.Next() {
-		var username string
-		err := rows.Scan(&username)
-		if err != nil {
-			return nil, err
-		}
-		owners = append(owners, username)
-	}
-
-	return owners, nil
-}
 
 // Helper function to check if a username is taken by a system user
 func isSystemUser(username string) bool {
@@ -519,6 +491,95 @@ func validateUsername(username string) error {
 	}
 
 	return nil
+}
+
+// SpiceDB query functions to read relationships
+
+// Get all members of a group from SpiceDB
+func getGroupMembersFromSpiceDB(groupUsername string) ([]map[string]string, error) {
+	// Query SpiceDB for subjects that have any relation to the group
+	request := &v1.ReadRelationshipsRequest{
+		RelationshipFilter: &v1.RelationshipFilter{
+			ResourceType:       "group",
+			OptionalResourceId: groupUsername,
+		},
+	}
+
+	log.Printf("[SPICEDB] operation=ReadRelationships resource_type=group resource_id=%s", groupUsername)
+
+	stream, err := spicedbClient.ReadRelationships(context.Background(), request)
+	if err != nil {
+		log.Printf("[SPICEDB] operation=ReadRelationships status=ERROR error=%v", err)
+		return nil, err
+	}
+
+	var members []map[string]string
+	for {
+		response, err := stream.Recv()
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			log.Printf("[SPICEDB] operation=ReadRelationships status=ERROR error=%v", err)
+			return nil, err
+		}
+
+		rel := response.Relationship
+		if rel.Subject.Object.ObjectType == "user" {
+			// Map SpiceDB relations to roles
+			role := "MEMBER"
+			if rel.Relation == "admin" {
+				role = "OWNER" // In our schema, admin includes both OWNER and MANAGER
+			}
+			
+			members = append(members, map[string]string{
+				"username": rel.Subject.Object.ObjectId,
+				"role":     role,
+			})
+		}
+	}
+
+	log.Printf("[SPICEDB] operation=ReadRelationships status=SUCCESS member_count=%d", len(members))
+	return members, nil
+}
+
+// Get owners of a group from SpiceDB
+func getGroupOwnersFromSpiceDB(groupUsername string) ([]string, error) {
+	request := &v1.ReadRelationshipsRequest{
+		RelationshipFilter: &v1.RelationshipFilter{
+			ResourceType:       "group",
+			OptionalResourceId: groupUsername,
+			OptionalRelation:   "admin", // Only get admin relationships (which include owners)
+		},
+	}
+
+	log.Printf("[SPICEDB] operation=ReadRelationships resource_type=group resource_id=%s relation=admin", groupUsername)
+
+	stream, err := spicedbClient.ReadRelationships(context.Background(), request)
+	if err != nil {
+		log.Printf("[SPICEDB] operation=ReadRelationships status=ERROR error=%v", err)
+		return nil, err
+	}
+
+	var owners []string
+	for {
+		response, err := stream.Recv()
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			log.Printf("[SPICEDB] operation=ReadRelationships status=ERROR error=%v", err)
+			return nil, err
+		}
+
+		rel := response.Relationship
+		if rel.Subject.Object.ObjectType == "user" {
+			owners = append(owners, rel.Subject.Object.ObjectId)
+		}
+	}
+
+	log.Printf("[SPICEDB] operation=ReadRelationships status=SUCCESS owner_count=%d", len(owners))
+	return owners, nil
 }
 
 // Public API endpoint to get all system users
@@ -561,21 +622,11 @@ func createGroup(c *gin.Context) {
 		return
 	}
 
-	// Add creator as owner in memberships
-	_, err = db.Exec(`
-		INSERT INTO group_memberships (group_username, username, role) 
-		VALUES ($1, $2, 'OWNER')
-	`, req.Username, req.OwnerUsername)
-	if err != nil {
-		log.Printf("Failed to add creator as owner: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add creator as owner"})
-		return
-	}
-
-	// Add relationship to SpiceDB
+	// Add creator as owner in SpiceDB (SpiceDB is the sole source of truth)
 	err = addSpiceDBRelationship(req.Username, req.OwnerUsername, "OWNER")
 	if err != nil {
 		log.Printf("Failed to add SpiceDB relationship for group %s: %v", req.Username, err)
+		// Don't fail the request if SpiceDB fails, but log it
 	}
 
 	// Fetch the created group
@@ -596,8 +647,8 @@ func createGroup(c *gin.Context) {
 	group.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
 	group.Email = fmt.Sprintf("%s@company.com", group.Username)
 
-	// Fetch owners for the created group
-	owners, err := getGroupOwners(req.Username)
+	// Fetch owners for the created group from SpiceDB
+	owners, err := getGroupOwnersFromSpiceDB(req.Username)
 	if err != nil {
 		log.Printf("Failed to fetch owners for created group %s: %v", req.Username, err)
 		group.Owners = []string{req.OwnerUsername} // fallback to creator
@@ -618,17 +669,12 @@ func getGroupMembers(c *gin.Context) {
 		return
 	}
 
-	rows, err := db.Query(`
-		SELECT username, role 
-		FROM group_memberships 
-		WHERE group_username = $1 
-		ORDER BY role, username
-	`, groupUsername)
+	// Fetch members from SpiceDB
+	memberData, err := getGroupMembersFromSpiceDB(groupUsername)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch group members"})
 		return
 	}
-	defer rows.Close()
 
 	type Member struct {
 		Username string `json:"username"`
@@ -636,14 +682,11 @@ func getGroupMembers(c *gin.Context) {
 	}
 
 	var members []Member
-	for rows.Next() {
-		var member Member
-		err := rows.Scan(&member.Username, &member.Role)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan member"})
-			return
-		}
-		members = append(members, member)
+	for _, memberInfo := range memberData {
+		members = append(members, Member{
+			Username: memberInfo["username"],
+			Role:     memberInfo["role"],
+		})
 	}
 
 	c.JSON(http.StatusOK, members)
@@ -695,23 +738,12 @@ func addGroupMember(c *gin.Context) {
 		return
 	}
 
-	// Add member to group
-	_, err = db.Exec(`
-		INSERT INTO group_memberships (group_username, username, role) 
-		VALUES ($1, $2, $3)
-		ON CONFLICT (group_username, username) 
-		DO UPDATE SET role = EXCLUDED.role
-	`, groupUsername, req.Username, req.Role)
-	if err != nil {
-		log.Printf("Failed to add member to group %s: %v", groupUsername, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add member to group"})
-		return
-	}
-
-	// Add relationship to SpiceDB
+	// Add member to group in SpiceDB (SpiceDB is the sole source of truth)
 	err = addSpiceDBRelationship(groupUsername, req.Username, req.Role)
 	if err != nil {
 		log.Printf("Failed to add SpiceDB relationship for user %s in group %s: %v", req.Username, groupUsername, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add member to group"})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Member added successfully"})
@@ -728,32 +760,12 @@ func removeGroupMember(c *gin.Context) {
 		return
 	}
 
-	// Remove member from group
-	result, err := db.Exec(`
-		DELETE FROM group_memberships 
-		WHERE group_username = $1 AND username = $2
-	`, groupUsername, memberUsername)
-	if err != nil {
-		log.Printf("Failed to remove member from group %s: %v", groupUsername, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove member from group"})
-		return
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check operation result"})
-		return
-	}
-
-	if rowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Member not found in group"})
-		return
-	}
-
-	// Remove relationship from SpiceDB
-	err = removeSpiceDBRelationship(groupUsername, memberUsername)
+	// Remove member from group in SpiceDB (SpiceDB is the sole source of truth)
+	err := removeSpiceDBRelationship(groupUsername, memberUsername)
 	if err != nil {
 		log.Printf("Failed to remove SpiceDB relationship for user %s in group %s: %v", memberUsername, groupUsername, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove member from group"})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Member removed successfully"})
