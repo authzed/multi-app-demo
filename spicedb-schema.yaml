@@ -9,13 +9,14 @@ definition group {
     permission delete = admin
     permission add_member = admin  
     permission view_members = admin + member
+    permission all_members = admin + member  // Permission representing all group members for sharing
 }
 
 definition folder {
     // Direct relations for folder sharing
     relation owner: user
-    relation editor: user | user:*
-    relation viewer: user | user:*
+    relation editor: user | user:* | group#all_members
+    relation viewer: user | user:* | group#all_members
     
     // Parent folder relation for inheritance
     relation parent: folder
@@ -30,8 +31,8 @@ definition folder {
 
 definition document {
     // Direct relations for document sharing
-    relation reader: user | user:*
-    relation editor: user | user:*
+    relation reader: user | user:* | group#all_members
+    relation editor: user | user:* | group#all_members
     relation owner: user
     
     // Parent folder relation for inheritance

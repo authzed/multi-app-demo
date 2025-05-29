@@ -10,6 +10,9 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
   const [newUsername, setNewUsername] = useState('')
   const [newRole, setNewRole] = useState('viewer')
   const [copyLinkSuccess, setCopyLinkSuccess] = useState(false)
+  const [users, setUsers] = useState([])
+  const [groups, setGroups] = useState([])
+  const [entitiesLoading, setEntitiesLoading] = useState(true)
 
   const fetchShares = useCallback(async () => {
     setLoading(true)
@@ -26,8 +29,13 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
 
       if (response.ok) {
         const data = await response.json()
-        setShares(data.shares || [])
-        setOriginalShares(data.shares || [])
+        // Ensure backward compatibility by setting default subjectType
+        const sharesWithType = (data.shares || []).map(share => ({
+          ...share,
+          subjectType: share.subjectType || 'user'
+        }))
+        setShares(sharesWithType)
+        setOriginalShares(sharesWithType)
       } else if (response.status === 403) {
         alert('You do not have permission to manage sharing for this item')
         onClose()
@@ -44,11 +52,45 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
     }
   }, [resourceType, resourceId, currentUser.username, onClose])
 
+  const fetchUsersAndGroups = useCallback(async () => {
+    setEntitiesLoading(true)
+    try {
+      // Fetch users and groups in parallel
+      const [usersResponse, groupsResponse] = await Promise.all([
+        fetch('http://localhost:3001/api/users'),
+        fetch('http://localhost:3001/api/groups')
+      ])
+
+      if (usersResponse.ok) {
+        const usersData = await usersResponse.json()
+        setUsers(usersData)
+      } else {
+        console.error('Failed to fetch users from groups service')
+        setUsers([])
+      }
+
+      if (groupsResponse.ok) {
+        const groupsData = await groupsResponse.json()
+        setGroups(groupsData)
+      } else {
+        console.error('Failed to fetch groups from groups service')
+        setGroups([])
+      }
+    } catch (error) {
+      console.error('Error fetching users and groups:', error)
+      setUsers([])
+      setGroups([])
+    } finally {
+      setEntitiesLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (isOpen && resourceType && resourceId) {
       fetchShares()
+      fetchUsersAndGroups()
     }
-  }, [isOpen, resourceType, resourceId, fetchShares])
+  }, [isOpen, resourceType, resourceId, fetchShares, fetchUsersAndGroups])
 
   const getRoleDisplayName = (role) => {
     if (resourceType === 'document') {
@@ -84,9 +126,49 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
     }
   }
 
+  const getDisplayNameForShare = (share) => {
+    if (share.subjectType === 'group') {
+      // Find the group name from our fetched groups
+      const group = groups.find(g => g.username === share.username)
+      if (group) {
+        return `${group.name} (${share.username}) - Group`
+      }
+      return `${share.username} - Group`
+    } else {
+      // Find the user name from our fetched users
+      const user = users.find(u => u.username === share.username)
+      if (user) {
+        return `${user.name} (${share.username})`
+      }
+      return share.username
+    }
+  }
+
+  const getAvailableEntities = () => {
+    // Combine users and groups into a single list
+    const allEntities = [
+      ...users.map(user => ({
+        id: user.username,
+        name: user.name,
+        type: 'user',
+        displayName: `${user.name} (${user.username})`
+      })),
+      ...groups.map(group => ({
+        id: group.username,
+        name: group.name,
+        type: 'group',
+        displayName: `${group.name} (${group.username}) - Group`
+      }))
+    ]
+
+    // Filter out entities that already have shares
+    const sharedUsernames = shares.filter(share => !share.isDeleted).map(share => share.username)
+    return allEntities.filter(entity => !sharedUsernames.includes(entity.id))
+  }
+
   const addShare = () => {
-    if (!newUsername.trim()) {
-      alert('Please enter a username')
+    if (!newUsername || !newUsername.trim()) {
+      alert('Please select a user or group')
       return
     }
 
@@ -97,9 +179,14 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
       return
     }
 
+    // Find the selected entity to get its type
+    const selectedEntity = getAvailableEntities().find(entity => entity.id === newUsername.trim())
+    const subjectType = selectedEntity ? selectedEntity.type : 'user'
+
     const newShare = {
       username: newUsername.trim(),
       role: newRole,
+      subjectType: subjectType,
       isNew: true
     }
 
@@ -149,34 +236,70 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
       const toAdd = []
       const toRemove = []
 
+      // Helper function to determine subject type for existing shares
+      const getSubjectTypeForUsername = (username) => {
+        const allEntities = [
+          ...users.map(user => ({ id: user.username, type: 'user' })),
+          ...groups.map(group => ({ id: group.username, type: 'group' }))
+        ]
+        const entity = allEntities.find(e => e.id === username)
+        return entity ? entity.type : 'user'
+      }
+
       // Collect new shares
       shares.filter(share => share.isNew).forEach(share => {
-        toAdd.push({
+        const shareRequest = {
           username: share.username,
-          role: share.role
-        })
+          role: share.role,
+          subjectType: share.subjectType || 'user'
+        }
+        // Add subject relation for groups
+        if (share.subjectType === 'group') {
+          shareRequest.subjectRelation = 'all_members'
+        }
+        toAdd.push(shareRequest)
       })
 
       // Collect deleted shares
       shares.filter(share => share.isDeleted).forEach(share => {
-        toRemove.push({
+        const subjectType = getSubjectTypeForUsername(share.username)
+        const shareRequest = {
           username: share.username,
-          role: share.role
-        })
+          role: share.role,
+          subjectType: subjectType
+        }
+        // Add subject relation for groups
+        if (subjectType === 'group') {
+          shareRequest.subjectRelation = 'all_members'
+        }
+        toRemove.push(shareRequest)
       })
 
       // Collect modified shares (remove old, add new)
       shares.filter(share => share.isModified).forEach(share => {
         const originalShare = originalShares.find(orig => orig.username === share.username)
         if (originalShare) {
-          toRemove.push({
+          const originalSubjectType = getSubjectTypeForUsername(originalShare.username)
+          const originalShareRequest = {
             username: originalShare.username,
-            role: originalShare.role
-          })
-          toAdd.push({
+            role: originalShare.role,
+            subjectType: originalSubjectType
+          }
+          if (originalSubjectType === 'group') {
+            originalShareRequest.subjectRelation = 'all_members'
+          }
+          toRemove.push(originalShareRequest)
+
+          const newSubjectType = getSubjectTypeForUsername(share.username)
+          const newShareRequest = {
             username: share.username,
-            role: share.role
-          })
+            role: share.role,
+            subjectType: newSubjectType
+          }
+          if (newSubjectType === 'group') {
+            newShareRequest.subjectRelation = 'all_members'
+          }
+          toAdd.push(newShareRequest)
         }
       })
 
@@ -259,7 +382,7 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
                     {visibleShares.map((share, index) => (
                       <div key={`${share.username}-${index}`} className="share-item">
                         <div className="share-info">
-                          <span className="username">{share.username}</span>
+                          <span className="username">{getDisplayNameForShare(share)}</span>
                           <WiredCombo
                             selected={share.role}
                             onselected={(e) => updateShareRole(index, e.detail.selected)}
@@ -288,34 +411,46 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
 
               <div className="add-share-section">
                 <h4>Add New Share</h4>
-                <div className="add-share-form">
-                  <WiredInput
-                    placeholder="Enter username"
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    disabled={saving}
-                    className="username-input"
-                  />
-                  <WiredCombo
-                    selected={newRole}
-                    onselected={(e) => setNewRole(e.detail.selected)}
-                    disabled={saving}
-                    className="role-select"
-                  >
-                    {getRoleOptions().map(option => (
-                      <WiredItem key={option.value} value={option.value}>
-                        {getRoleDisplayName(option.value)}
+                {entitiesLoading ? (
+                  <div className="loading-state">Loading users and groups...</div>
+                ) : (
+                  <div className="add-share-form">
+                    <WiredCombo
+                      selected={newUsername}
+                      onselected={(e) => setNewUsername(e.detail.selected)}
+                      disabled={saving}
+                      className="username-input"
+                    >
+                      <WiredItem value="" text="Select user or group">
+                        Select user or group
                       </WiredItem>
-                    ))}
-                  </WiredCombo>
-                  <WiredButton
-                    onClick={addShare}
-                    disabled={saving}
-                    style={{ backgroundColor: '#2ecc71', color: 'white' }}
-                  >
-                    Add
-                  </WiredButton>
-                </div>
+                      {getAvailableEntities().map(entity => (
+                        <WiredItem key={entity.id} value={entity.id}>
+                          {entity.displayName}
+                        </WiredItem>
+                      ))}
+                    </WiredCombo>
+                    <WiredCombo
+                      selected={newRole}
+                      onselected={(e) => setNewRole(e.detail.selected)}
+                      disabled={saving}
+                      className="role-select"
+                    >
+                      {getRoleOptions().map(option => (
+                        <WiredItem key={option.value} value={option.value}>
+                          {getRoleDisplayName(option.value)}
+                        </WiredItem>
+                      ))}
+                    </WiredCombo>
+                    <WiredButton
+                      onClick={addShare}
+                      disabled={saving || !newUsername}
+                      style={{ backgroundColor: '#2ecc71', color: 'white' }}
+                    >
+                      Add
+                    </WiredButton>
+                  </div>
+                )}
               </div>
 
               <div className="dialog-actions">

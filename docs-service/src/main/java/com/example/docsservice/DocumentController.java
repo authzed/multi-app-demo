@@ -62,6 +62,7 @@ public class DocumentController {
                 .withCallCredentials(bearerToken);
     }
     
+    
     private CheckPermissionRequest.Builder buildPermissionCheck(String resourceType, String resourceId, String permission, String username) {
         return CheckPermissionRequest.newBuilder()
                 .setResource(ObjectReference.newBuilder()
@@ -623,6 +624,13 @@ public class DocumentController {
                 Map<String, String> share = new HashMap<>();
                 share.put("username", rel.getSubject().getObject().getObjectId());
                 share.put("role", rel.getRelation());
+                share.put("subjectType", rel.getSubject().getObject().getObjectType());
+                
+                // Include subject relation if present (for groups)
+                if (!rel.getSubject().getOptionalRelation().isEmpty()) {
+                    share.put("subjectRelation", rel.getSubject().getOptionalRelation());
+                }
+                
                 shares.add(share);
             });
 
@@ -682,6 +690,13 @@ public class DocumentController {
                 Map<String, String> share = new HashMap<>();
                 share.put("username", rel.getSubject().getObject().getObjectId());
                 share.put("role", rel.getRelation());
+                share.put("subjectType", rel.getSubject().getObject().getObjectType());
+                
+                // Include subject relation if present (for groups)
+                if (!rel.getSubject().getOptionalRelation().isEmpty()) {
+                    share.put("subjectRelation", rel.getSubject().getOptionalRelation());
+                }
+                
                 shares.add(share);
             });
 
@@ -741,6 +756,19 @@ public class DocumentController {
                 for (Map<String, String> share : toAdd) {
                     String shareUsername = share.get("username");
                     String role = share.get("role");
+                    String subjectType = share.getOrDefault("subjectType", "user");
+                    String subjectRelation = share.get("subjectRelation");
+                    
+                    SubjectReference.Builder subjectBuilder = SubjectReference.newBuilder()
+                            .setObject(ObjectReference.newBuilder()
+                                    .setObjectType(subjectType)
+                                    .setObjectId(shareUsername)
+                                    .build());
+                    
+                    // Add optional subject relation for groups
+                    if (subjectRelation != null && !subjectRelation.isEmpty()) {
+                        subjectBuilder.setOptionalRelation(subjectRelation);
+                    }
                     
                     RelationshipUpdate update = RelationshipUpdate.newBuilder()
                             .setOperation(RelationshipUpdate.Operation.OPERATION_CREATE)
@@ -750,12 +778,7 @@ public class DocumentController {
                                             .setObjectId(resourceId)
                                             .build())
                                     .setRelation(role)
-                                    .setSubject(SubjectReference.newBuilder()
-                                            .setObject(ObjectReference.newBuilder()
-                                                    .setObjectType("user")
-                                                    .setObjectId(shareUsername)
-                                                    .build())
-                                            .build())
+                                    .setSubject(subjectBuilder.build())
                                     .build())
                             .build();
                     writeRequestBuilder.addUpdates(update);
@@ -767,6 +790,19 @@ public class DocumentController {
                 for (Map<String, String> share : toRemove) {
                     String shareUsername = share.get("username");
                     String role = share.get("role");
+                    String subjectType = share.getOrDefault("subjectType", "user");
+                    String subjectRelation = share.get("subjectRelation");
+                    
+                    SubjectReference.Builder subjectBuilder = SubjectReference.newBuilder()
+                            .setObject(ObjectReference.newBuilder()
+                                    .setObjectType(subjectType)
+                                    .setObjectId(shareUsername)
+                                    .build());
+                    
+                    // Add optional subject relation for groups
+                    if (subjectRelation != null && !subjectRelation.isEmpty()) {
+                        subjectBuilder.setOptionalRelation(subjectRelation);
+                    }
                     
                     RelationshipUpdate update = RelationshipUpdate.newBuilder()
                             .setOperation(RelationshipUpdate.Operation.OPERATION_DELETE)
@@ -776,12 +812,7 @@ public class DocumentController {
                                             .setObjectId(resourceId)
                                             .build())
                                     .setRelation(role)
-                                    .setSubject(SubjectReference.newBuilder()
-                                            .setObject(ObjectReference.newBuilder()
-                                                    .setObjectType("user")
-                                                    .setObjectId(shareUsername)
-                                                    .build())
-                                            .build())
+                                    .setSubject(subjectBuilder.build())
                                     .build())
                             .build();
                     writeRequestBuilder.addUpdates(update);
