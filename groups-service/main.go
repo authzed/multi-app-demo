@@ -145,19 +145,34 @@ func initializeTestData() {
 	}
 
 	if len(updates) > 0 {
-		_, err = spicedbClient.WriteRelationships(context.Background(), &v1.WriteRelationshipsRequest{
+		request := &v1.WriteRelationshipsRequest{
 			Updates: updates,
-		})
+		}
+
+		// Log the SpiceDB initialization request
+		log.Printf("[SPICEDB] operation=WriteRelationships context=initialization update_count=%d", len(updates))
+		for i, update := range updates {
+			log.Printf("[SPICEDB] operation=WriteRelationships context=initialization update=%d action=%s resource_type=%s resource_id=%s relation=%s subject_type=%s subject_id=%s",
+				i+1,
+				update.Operation.String(),
+				update.Relationship.Resource.ObjectType,
+				update.Relationship.Resource.ObjectId,
+				update.Relationship.Relation,
+				update.Relationship.Subject.Object.ObjectType,
+				update.Relationship.Subject.Object.ObjectId)
+		}
+
+		resp, err := spicedbClient.WriteRelationships(context.Background(), request)
 		if err != nil {
-			log.Printf("Failed to initialize SpiceDB relationships: %v", err)
+			log.Printf("[SPICEDB] operation=WriteRelationships context=initialization status=ERROR error=%v", err)
 		} else {
-			log.Printf("Initialized %d SpiceDB relationships", len(updates))
+			log.Printf("[SPICEDB] operation=WriteRelationships context=initialization status=SUCCESS written_at=%s update_count=%d", resp.WrittenAt.Token, len(updates))
 		}
 	}
 }
 
 func checkPermission(username string, groupID int, permission string) bool {
-	resp, err := spicedbClient.CheckPermission(context.Background(), &v1.CheckPermissionRequest{
+	request := &v1.CheckPermissionRequest{
 		Resource: &v1.ObjectReference{
 			ObjectType: "group",
 			ObjectId:   fmt.Sprintf("%d", groupID),
@@ -169,11 +184,22 @@ func checkPermission(username string, groupID int, permission string) bool {
 				ObjectId:   username,
 			},
 		},
-	})
+	}
+
+	// Log the SpiceDB check request parameters
+	log.Printf("[SPICEDB] operation=CheckPermission resource_type=%s resource_id=%s permission=%s subject_type=%s subject_id=%s",
+		request.Resource.ObjectType, request.Resource.ObjectId, request.Permission,
+		request.Subject.Object.ObjectType, request.Subject.Object.ObjectId)
+
+	resp, err := spicedbClient.CheckPermission(context.Background(), request)
 	if err != nil {
-		log.Printf("SpiceDB permission check failed: %v", err)
+		log.Printf("[SPICEDB] operation=CheckPermission status=ERROR error=%v", err)
 		return false
 	}
+
+	// Log the response
+	log.Printf("[SPICEDB] operation=CheckPermission status=SUCCESS permissionship=%s", resp.Permissionship.String())
+
 	return resp.Permissionship == v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION
 }
 
@@ -188,7 +214,7 @@ func addSpiceDBRelationship(groupID int, username string, role string) error {
 		return fmt.Errorf("invalid role: %s", role)
 	}
 
-	_, err := spicedbClient.WriteRelationships(context.Background(), &v1.WriteRelationshipsRequest{
+	request := &v1.WriteRelationshipsRequest{
 		Updates: []*v1.RelationshipUpdate{
 			{
 				Operation: v1.RelationshipUpdate_OPERATION_CREATE,
@@ -207,8 +233,22 @@ func addSpiceDBRelationship(groupID int, username string, role string) error {
 				},
 			},
 		},
-	})
-	return err
+	}
+
+	// Log the SpiceDB write request parameters
+	log.Printf("[SPICEDB] operation=WriteRelationships action=CREATE resource_type=group resource_id=%d relation=%s subject_type=user subject_id=%s",
+		groupID, relation, username)
+
+	resp, err := spicedbClient.WriteRelationships(context.Background(), request)
+	if err != nil {
+		log.Printf("[SPICEDB] operation=WriteRelationships status=ERROR error=%v", err)
+		return err
+	}
+
+	// Log the response
+	log.Printf("[SPICEDB] operation=WriteRelationships status=SUCCESS written_at=%s", resp.WrittenAt.Token)
+
+	return nil
 }
 
 func removeSpiceDBRelationship(groupID int, username string) error {
@@ -248,10 +288,23 @@ func removeSpiceDBRelationship(groupID int, username string) error {
 		},
 	}
 
-	_, err := spicedbClient.WriteRelationships(context.Background(), &v1.WriteRelationshipsRequest{
+	request := &v1.WriteRelationshipsRequest{
 		Updates: updates,
-	})
-	return err
+	}
+
+	// Log the SpiceDB write request parameters
+	log.Printf("[SPICEDB] operation=WriteRelationships action=DELETE resource_type=group resource_id=%d subject_type=user subject_id=%s relations=admin,member", groupID, username)
+
+	resp, err := spicedbClient.WriteRelationships(context.Background(), request)
+	if err != nil {
+		log.Printf("[SPICEDB] operation=WriteRelationships status=ERROR error=%v", err)
+		return err
+	}
+
+	// Log the response
+	log.Printf("[SPICEDB] operation=WriteRelationships status=SUCCESS written_at=%s", resp.WrittenAt.Token)
+
+	return nil
 }
 
 func deleteSpiceDBGroup(groupID int) error {
@@ -261,10 +314,23 @@ func deleteSpiceDBGroup(groupID int) error {
 		OptionalResourceId: fmt.Sprintf("%d", groupID),
 	}
 
-	_, err := spicedbClient.DeleteRelationships(context.Background(), &v1.DeleteRelationshipsRequest{
+	request := &v1.DeleteRelationshipsRequest{
 		RelationshipFilter: filter,
-	})
-	return err
+	}
+
+	// Log the SpiceDB delete request parameters
+	log.Printf("[SPICEDB] operation=DeleteRelationships resource_type=group resource_id=%d", groupID)
+
+	resp, err := spicedbClient.DeleteRelationships(context.Background(), request)
+	if err != nil {
+		log.Printf("[SPICEDB] operation=DeleteRelationships status=ERROR error=%v", err)
+		return err
+	}
+
+	// Log the response
+	log.Printf("[SPICEDB] operation=DeleteRelationships status=SUCCESS deleted_at=%s", resp.DeletedAt.Token)
+
+	return nil
 }
 
 func initDB() {
@@ -303,6 +369,32 @@ func initDB() {
 	}
 
 	log.Println("Database connected and schema initialized")
+}
+
+func logMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		path := c.Request.URL.Path
+		raw := c.Request.URL.RawQuery
+
+		// Process request
+		c.Next()
+
+		// Log request
+		end := time.Now()
+		latency := end.Sub(start)
+
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+		statusCode := c.Writer.Status()
+		
+		if raw != "" {
+			path = path + "?" + raw
+		}
+
+		log.Printf("[HTTP] method=%s path=%s status=%d latency=%v ip=%s", 
+			method, path, statusCode, latency, clientIP)
+	}
 }
 
 func corsMiddleware() gin.HandlerFunc {
@@ -676,7 +768,10 @@ func main() {
 	defer db.Close()
 	initSpiceDB()
 
-	r := gin.Default()
+	// Disable Gin's default logger and use our custom one
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+	r.Use(logMiddleware())
 	r.Use(corsMiddleware())
 
 	r.GET("/health", func(c *gin.Context) {

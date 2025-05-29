@@ -16,7 +16,11 @@ function GroupDetailPage({ currentUser }) {
 
   const fetchGroupDetails = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3001/groups')
+      const response = await fetch('http://localhost:3001/groups', {
+        headers: {
+          'X-Username': currentUser.username
+        }
+      })
       const groups = await response.json()
       const groupDetail = groups.find(g => g.id === parseInt(id))
       
@@ -31,7 +35,7 @@ function GroupDetailPage({ currentUser }) {
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, currentUser.username])
 
   const fetchGroupMembers = useCallback(async () => {
     try {

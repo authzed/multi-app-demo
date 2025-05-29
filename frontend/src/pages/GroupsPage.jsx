@@ -14,11 +14,15 @@ function GroupsPage({ currentUser }) {
 
   useEffect(() => {
     fetchGroups()
-  }, [])
+  }, [currentUser.username])
 
   const fetchGroups = async () => {
     try {
-      const response = await fetch('http://localhost:3001/groups')
+      const response = await fetch('http://localhost:3001/groups', {
+        headers: {
+          'X-Username': currentUser.username
+        }
+      })
       const data = await response.json()
       setGroups(data)
     } catch (error) {
@@ -63,7 +67,10 @@ function GroupsPage({ currentUser }) {
 
     try {
       const response = await fetch(`http://localhost:3001/groups/${groupId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'X-Username': currentUser.username
+        }
       })
       
       if (response.ok) {
