@@ -670,6 +670,50 @@ func getUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, systemUsers)
 }
 
+// Public API endpoint to get all registered groups (basic info only)
+func getPublicGroups(c *gin.Context) {
+	rows, err := db.Query(`
+		SELECT username, name, description, visibility, created_at 
+		FROM groups 
+		WHERE visibility IN ('PUBLIC', 'RESTRICTED')
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch public groups"})
+		return
+	}
+	defer rows.Close()
+
+	type PublicGroup struct {
+		Username    string `json:"username"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Email       string `json:"email"`
+		Visibility  string `json:"visibility"`
+		CreatedAt   string `json:"created_at"`
+	}
+
+	var groups []PublicGroup
+	for rows.Next() {
+		var group PublicGroup
+		var createdAt time.Time
+		err := rows.Scan(
+			&group.Username, &group.Name, &group.Description,
+			&group.Visibility, &createdAt,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan group"})
+			return
+		}
+		group.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
+		group.Email = fmt.Sprintf("%s@company.com", group.Username)
+
+		groups = append(groups, group)
+	}
+
+	c.JSON(http.StatusOK, groups)
+}
+
 func createGroup(c *gin.Context) {
 	var req CreateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -916,6 +960,7 @@ func main() {
 
 	// Public API endpoints
 	r.GET("/api/users", getUsers)
+	r.GET("/api/groups", getPublicGroups)
 
 	r.GET("/groups", getGroups)
 	r.POST("/groups", createGroup)
