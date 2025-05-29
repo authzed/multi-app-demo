@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS groups (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     visibility VARCHAR(50) DEFAULT 'PUBLIC' CHECK (visibility IN ('PUBLIC', 'PRIVATE', 'RESTRICTED')),
+    zedtoken VARCHAR(255), -- SpiceDB consistency token for read-after-write consistency
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

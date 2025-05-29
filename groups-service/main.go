@@ -26,6 +26,7 @@ type Group struct {
 	Description string   `json:"description" db:"description"`
 	Email       string   `json:"email"`
 	Visibility  string   `json:"visibility" db:"visibility"`
+	Zedtoken    string   `json:"zedtoken,omitempty" db:"zedtoken"`
 	Owners      []string `json:"owners"`
 	CreatedAt   string   `json:"created_at" db:"created_at"`
 }
@@ -177,6 +178,13 @@ func initializeTestData() {
 			log.Printf("[SPICEDB] operation=WriteRelationships context=initialization status=ERROR error=%v", err)
 		} else {
 			log.Printf("[SPICEDB] operation=WriteRelationships context=initialization status=SUCCESS written_at=%s update_count=%d", resp.WrittenAt.Token, len(updates))
+
+			// Store zedtokens for both test groups
+			for _, groupUsername := range []string{"engineering", "product"} {
+				if err := storeGroupZedtoken(groupUsername, resp.WrittenAt.Token); err != nil {
+					log.Printf("Warning: Failed to store initial zedtoken for group %s: %v", groupUsername, err)
+				}
+			}
 		}
 	}
 }
@@ -194,6 +202,7 @@ func checkPermission(username string, groupUsername string, permission string) b
 				ObjectId:   username,
 			},
 		},
+		Consistency: getConsistencyForGroup(groupUsername),
 	}
 
 	// Log the SpiceDB check request parameters
@@ -255,8 +264,14 @@ func addSpiceDBRelationship(groupUsername string, username string, role string) 
 		return err
 	}
 
-	// Log the response
+	// Log the response and store zedtoken
 	log.Printf("[SPICEDB] operation=WriteRelationships status=SUCCESS written_at=%s", resp.WrittenAt.Token)
+
+	// Store the zedtoken for future consistency
+	if err := storeGroupZedtoken(groupUsername, resp.WrittenAt.Token); err != nil {
+		log.Printf("Warning: Failed to store zedtoken for group %s: %v", groupUsername, err)
+		// Don't fail the operation if zedtoken storage fails
+	}
 
 	return nil
 }
@@ -311,8 +326,14 @@ func removeSpiceDBRelationship(groupUsername string, username string) error {
 		return err
 	}
 
-	// Log the response
+	// Log the response and store zedtoken
 	log.Printf("[SPICEDB] operation=WriteRelationships status=SUCCESS written_at=%s", resp.WrittenAt.Token)
+
+	// Store the zedtoken for future consistency
+	if err := storeGroupZedtoken(groupUsername, resp.WrittenAt.Token); err != nil {
+		log.Printf("Warning: Failed to store zedtoken for group %s: %v", groupUsername, err)
+		// Don't fail the operation if zedtoken storage fails
+	}
 
 	return nil
 }
@@ -337,8 +358,14 @@ func deleteSpiceDBGroup(groupUsername string) error {
 		return err
 	}
 
-	// Log the response
+	// Log the response and store zedtoken
 	log.Printf("[SPICEDB] operation=DeleteRelationships status=SUCCESS deleted_at=%s", resp.DeletedAt.Token)
+
+	// Store the zedtoken for future consistency
+	if err := storeGroupZedtoken(groupUsername, resp.DeletedAt.Token); err != nil {
+		log.Printf("Warning: Failed to store zedtoken for group %s: %v", groupUsername, err)
+		// Don't fail the operation if zedtoken storage fails
+	}
 
 	return nil
 }
@@ -397,12 +424,12 @@ func logMiddleware() gin.HandlerFunc {
 		clientIP := c.ClientIP()
 		method := c.Request.Method
 		statusCode := c.Writer.Status()
-		
+
 		if raw != "" {
 			path = path + "?" + raw
 		}
 
-		log.Printf("[HTTP] method=%s path=%s status=%d latency=%v ip=%s", 
+		log.Printf("[HTTP] method=%s path=%s status=%d latency=%v ip=%s",
 			method, path, statusCode, latency, clientIP)
 	}
 }
@@ -422,7 +449,7 @@ func corsMiddleware() gin.HandlerFunc {
 
 func getGroups(c *gin.Context) {
 	rows, err := db.Query(`
-		SELECT g.username, g.name, g.description, g.visibility, g.created_at 
+		SELECT g.username, g.name, g.description, g.visibility, g.zedtoken, g.created_at 
 		FROM groups g 
 		ORDER BY g.created_at DESC
 	`)
@@ -436,9 +463,10 @@ func getGroups(c *gin.Context) {
 	for rows.Next() {
 		var group Group
 		var createdAt time.Time
+		var zedtoken sql.NullString
 		err := rows.Scan(
 			&group.Username, &group.Name, &group.Description,
-			&group.Visibility, &createdAt,
+			&group.Visibility, &zedtoken, &createdAt,
 		)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan group"})
@@ -446,6 +474,9 @@ func getGroups(c *gin.Context) {
 		}
 		group.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
 		group.Email = fmt.Sprintf("%s@company.com", group.Username)
+		if zedtoken.Valid {
+			group.Zedtoken = zedtoken.String
+		}
 
 		// Fetch owners for this group from SpiceDB
 		owners, err := getGroupOwnersFromSpiceDB(group.Username)
@@ -461,7 +492,6 @@ func getGroups(c *gin.Context) {
 
 	c.JSON(http.StatusOK, groups)
 }
-
 
 // Helper function to check if a username is taken by a system user
 func isSystemUser(username string) bool {
@@ -493,6 +523,57 @@ func validateUsername(username string) error {
 	return nil
 }
 
+// Zedtoken management functions
+
+// Store zedtoken for a group after SpiceDB mutations
+func storeGroupZedtoken(groupUsername, zedtoken string) error {
+	_, err := db.Exec(`
+		UPDATE groups 
+		SET zedtoken = $1, updated_at = CURRENT_TIMESTAMP 
+		WHERE username = $2
+	`, zedtoken, groupUsername)
+	if err != nil {
+		log.Printf("Failed to store zedtoken for group %s: %v", groupUsername, err)
+		return err
+	}
+	log.Printf("Stored zedtoken for group %s: %s", groupUsername, zedtoken)
+	return nil
+}
+
+// Get consistency requirement for a group based on stored zedtoken
+func getConsistencyForGroup(groupUsername string) *v1.Consistency {
+	var zedtoken sql.NullString
+	err := db.QueryRow(`
+		SELECT zedtoken 
+		FROM groups 
+		WHERE username = $1
+	`, groupUsername).Scan(&zedtoken)
+	if err != nil {
+		log.Printf("Failed to get zedtoken for group %s, using immediate consistency: %v", groupUsername, err)
+		return &v1.Consistency{
+			Requirement: &v1.Consistency_FullyConsistent{
+				FullyConsistent: true,
+			},
+		}
+	}
+
+	if zedtoken.Valid {
+		log.Printf("Using AtLeastAsFresh consistency for group %s with zedtoken: %s", groupUsername, zedtoken.String)
+		return &v1.Consistency{
+			Requirement: &v1.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &v1.ZedToken{Token: zedtoken.String},
+			},
+		}
+	}
+
+	log.Printf("No zedtoken for group %s, using immediate consistency", groupUsername)
+	return &v1.Consistency{
+		Requirement: &v1.Consistency_FullyConsistent{
+			FullyConsistent: true,
+		},
+	}
+}
+
 // SpiceDB query functions to read relationships
 
 // Get all members of a group from SpiceDB
@@ -503,6 +584,7 @@ func getGroupMembersFromSpiceDB(groupUsername string) ([]map[string]string, erro
 			ResourceType:       "group",
 			OptionalResourceId: groupUsername,
 		},
+		Consistency: getConsistencyForGroup(groupUsername),
 	}
 
 	log.Printf("[SPICEDB] operation=ReadRelationships resource_type=group resource_id=%s", groupUsername)
@@ -531,7 +613,7 @@ func getGroupMembersFromSpiceDB(groupUsername string) ([]map[string]string, erro
 			if rel.Relation == "admin" {
 				role = "OWNER" // In our schema, admin includes both OWNER and MANAGER
 			}
-			
+
 			members = append(members, map[string]string{
 				"username": rel.Subject.Object.ObjectId,
 				"role":     role,
@@ -551,6 +633,7 @@ func getGroupOwnersFromSpiceDB(groupUsername string) ([]string, error) {
 			OptionalResourceId: groupUsername,
 			OptionalRelation:   "admin", // Only get admin relationships (which include owners)
 		},
+		Consistency: getConsistencyForGroup(groupUsername),
 	}
 
 	log.Printf("[SPICEDB] operation=ReadRelationships resource_type=group resource_id=%s relation=admin", groupUsername)
@@ -632,12 +715,13 @@ func createGroup(c *gin.Context) {
 	// Fetch the created group
 	var group Group
 	var createdAt time.Time
+	var zedtoken sql.NullString
 	err = db.QueryRow(`
-		SELECT username, name, description, visibility, created_at 
+		SELECT username, name, description, visibility, zedtoken, created_at 
 		FROM groups WHERE username = $1
 	`, req.Username).Scan(
 		&group.Username, &group.Name, &group.Description,
-		&group.Visibility, &createdAt,
+		&group.Visibility, &zedtoken, &createdAt,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch created group"})
@@ -646,6 +730,9 @@ func createGroup(c *gin.Context) {
 
 	group.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
 	group.Email = fmt.Sprintf("%s@company.com", group.Username)
+	if zedtoken.Valid {
+		group.Zedtoken = zedtoken.String
+	}
 
 	// Fetch owners for the created group from SpiceDB
 	owners, err := getGroupOwnersFromSpiceDB(req.Username)
