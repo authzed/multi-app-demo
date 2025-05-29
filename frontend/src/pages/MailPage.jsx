@@ -24,6 +24,47 @@ function MailPage({ currentUser }) {
     if (!newEmail.subject.trim() || !newEmail.to.trim()) return
 
     try {
+      // First, perform preflight check if there's a body
+      if (newEmail.body.trim()) {
+        const preflightResponse = await fetch('http://localhost:3002/emails/preflight', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: newEmail.to,
+            body: newEmail.body,
+            from: currentUser.username + '@company.com'
+          })
+        })
+        
+        if (!preflightResponse.ok) {
+          const preflightData = await preflightResponse.json()
+          if (preflightResponse.status === 403) {
+            const inaccessibleDocs = preflightData.inaccessibleDocuments || []
+            const uncheckableDocs = preflightData.uncheckableDocuments || []
+            
+            let errorMessage = 'Cannot send email:\n'
+            
+            if (inaccessibleDocs.length > 0) {
+              errorMessage += `\nRecipient ${preflightData.recipient} does not have access to these documents:\n${inaccessibleDocs.join('\n')}`
+            }
+            
+            if (uncheckableDocs.length > 0) {
+              errorMessage += `\nYou don't have permission to check access for these documents:\n${uncheckableDocs.join('\n')}`
+            }
+            
+            if (inaccessibleDocs.length === 0 && uncheckableDocs.length === 0) {
+              errorMessage += preflightData.error
+            }
+            
+            alert(errorMessage)
+          } else {
+            alert(`Preflight check failed: ${preflightData.error || 'Unknown error'}`)
+          }
+          return
+        }
+      }
+
+      // If preflight passes, send the email
       const emailToSend = {
         ...newEmail,
         from: currentUser.username + '@company.com'
@@ -33,11 +74,19 @@ function MailPage({ currentUser }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailToSend)
       })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        alert(`Failed to send email: ${errorData.error || 'Unknown error'}`)
+        return
+      }
+      
       const createdEmail = await response.json()
       setEmails([...emails, createdEmail])
       setNewEmail({ subject: '', to: '', body: '' })
     } catch (error) {
       console.error('Error sending email:', error)
+      alert('Failed to send email. Please try again.')
     }
   }
 
