@@ -40,18 +40,14 @@ services:
       - postgres
       - spicedb-migrate
     healthcheck:
-      test: ["CMD", "sh", "-c", "spicedb health --grpc-addr=localhost:50051 || exit 1"]
+      test: ["CMD", "grpc_health_probe", "-v", "--addr", "localhost:50051", "-connect-timeout", "180s"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   spicedb-schema:
     image: authzed/zed:latest
-    command: >
-      sh -c "
-        zed schema write --endpoint=spicedb:50051 --token=testtesttesttest /schema/spicedb-schema.yaml &&
-        echo 'Schema applied successfully!'
-      "
+    command: "schema write --endpoint=spicedb:50051 --token=testtesttesttest --insecure /schema/spicedb-schema.yaml"
     volumes:
       - ./spicedb-schema.yaml:/schema/spicedb-schema.yaml:ro
     depends_on:
@@ -64,12 +60,14 @@ services:
       - "3001:3001"
     environment:
       - GIN_MODE=release
-      - DATABASE_URL=postgres://demo:demo123@postgres:5432/groups_db
+      - DATABASE_URL=postgres://demo:demo123@postgres:5432/groups_db?sslmode=disable
       - SPICEDB_ENDPOINT=spicedb:50051
       - SPICEDB_TOKEN=testtesttesttest
     depends_on:
-      - postgres
-      - spicedb
+      postgres:
+        condition: service_healthy
+      spicedb-schema:
+        condition: service_completed_successfully
 
   mail-service:
     build: ./mail-service
@@ -81,8 +79,10 @@ services:
       - SPICEDB_ENDPOINT=spicedb:50051
       - SPICEDB_TOKEN=testtesttesttest
     depends_on:
-      - postgres
-      - spicedb
+      postgres:
+        condition: service_healthy
+      spicedb-schema:
+        condition: service_completed_successfully
 
   docs-service:
     build: ./docs-service
@@ -96,8 +96,10 @@ services:
       - SPICEDB_ENDPOINT=spicedb:50051
       - SPICEDB_TOKEN=testtesttesttest
     depends_on:
-      - postgres
-      - spicedb
+      postgres:
+        condition: service_healthy
+      spicedb-schema:
+        condition: service_completed_successfully
 
   frontend:
     build: ./frontend
