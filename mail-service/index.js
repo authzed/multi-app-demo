@@ -94,7 +94,15 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/emails/sent', (req, res) => {
-  res.json(sentEmails);
+  const username = req.headers['x-username'];
+  
+  if (!username) {
+    return res.status(400).json({ error: 'X-Username header is required' });
+  }
+  
+  // Filter emails by sender username
+  const filteredEmails = sentEmails.filter(email => email.senderUsername === username);
+  res.json(filteredEmails);
 });
 
 app.post('/emails/preflight', async (req, res) => {
@@ -179,7 +187,8 @@ app.post('/emails/send', async (req, res) => {
       to,
       subject,
       body,
-      from
+      from,
+      senderUsername: extractUsernameFromEmail(from)
     };
 
     sentEmails.push(newEmail);

@@ -8,13 +8,17 @@ function MailPage({ currentUser }) {
 
   const fetchEmails = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3002/emails/sent')
+      const response = await fetch('http://localhost:3002/emails/sent', {
+        headers: {
+          'X-Username': currentUser.username
+        }
+      })
       const data = await response.json()
       setEmails(data)
     } catch (error) {
       console.error('Error fetching emails:', error)
     }
-  }, [])
+  }, [currentUser.username])
 
   useEffect(() => {
     fetchEmails()
