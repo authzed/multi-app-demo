@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
+import { API_URLS } from '../config/api'
 import './PageLayout.css'
 
 function GroupsPage({ currentUser }) {
@@ -14,7 +15,7 @@ function GroupsPage({ currentUser }) {
 
   const fetchGroups = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3001/groups', {
+      const response = await fetch('${API_URLS.groups}/groups', {
         headers: {
           'X-Username': currentUser.username
         }
@@ -34,7 +35,7 @@ function GroupsPage({ currentUser }) {
     if (!newGroup.name.trim() || !newGroup.username.trim()) return
 
     try {
-      const response = await fetch('http://localhost:3001/groups', {
+      const response = await fetch('${API_URLS.groups}/groups', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -69,7 +70,7 @@ function GroupsPage({ currentUser }) {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/groups/${groupUsername}`, {
+      const response = await fetch(`${API_URLS.groups}/groups/${groupUsername}`, {
         method: 'DELETE',
         headers: {
           'X-Username': currentUser.username

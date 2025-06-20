@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
+import { API_URLS } from '../config/api'
 import ShareDialog from '../components/ShareDialog'
 import './PageLayout.css'
 
@@ -19,7 +20,7 @@ function DocumentEditPage({ currentUser }) {
   const fetchDocument = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetch(`http://localhost:3003/documents/${documentId}`, {
+      const response = await fetch(`${API_URLS.docs}/documents/${documentId}`, {
         headers: {
           'X-Username': currentUser.username
         }
@@ -60,7 +61,7 @@ function DocumentEditPage({ currentUser }) {
 
     try {
       setSaving(true)
-      const response = await fetch(`http://localhost:3003/documents/${documentId}`, {
+      const response = await fetch(`${API_URLS.docs}/documents/${documentId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -98,7 +99,7 @@ function DocumentEditPage({ currentUser }) {
     }
 
     try {
-      const response = await fetch(`http://localhost:3003/documents/${documentId}`, {
+      const response = await fetch(`${API_URLS.docs}/documents/${documentId}`, {
         method: 'DELETE',
         headers: {
           'X-Username': currentUser.username

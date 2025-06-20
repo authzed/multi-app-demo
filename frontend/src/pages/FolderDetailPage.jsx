@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
+import { API_URLS } from '../config/api'
 import ShareDialog from '../components/ShareDialog'
 import './PageLayout.css'
 
@@ -21,8 +22,8 @@ function FolderDetailPage({ currentUser }) {
     try {
       setLoading(true)
       const url = folderId ? 
-        `http://localhost:3003/folders/${folderId}` : 
-        'http://localhost:3003/folders/root'
+        `${API_URLS.docs}/folders/${folderId}` : 
+        `${API_URLS.docs}/folders/root`
       
       const response = await fetch(url, {
         headers: {
@@ -56,7 +57,7 @@ function FolderDetailPage({ currentUser }) {
     if (!newDocTitle.trim()) return
 
     try {
-      const response = await fetch('http://localhost:3003/documents', {
+      const response = await fetch(`${API_URLS.docs}/documents`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -87,7 +88,7 @@ function FolderDetailPage({ currentUser }) {
     if (!newFolderName.trim()) return
 
     try {
-      const response = await fetch('http://localhost:3003/folders', {
+      const response = await fetch(`${API_URLS.docs}/folders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -118,7 +119,7 @@ function FolderDetailPage({ currentUser }) {
     }
 
     try {
-      const response = await fetch(`http://localhost:3003/documents/${docId}`, {
+      const response = await fetch(`${API_URLS.docs}/documents/${docId}`, {
         method: 'DELETE',
         headers: {
           'X-Username': currentUser.username
@@ -142,7 +143,7 @@ function FolderDetailPage({ currentUser }) {
     }
 
     try {
-      const response = await fetch(`http://localhost:3003/folders/${folderId}`, {
+      const response = await fetch(`${API_URLS.docs}/folders/${folderId}`, {
         method: 'DELETE',
         headers: {
           'X-Username': currentUser.username

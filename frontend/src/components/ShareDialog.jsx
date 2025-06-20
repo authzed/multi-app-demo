@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { WiredCard, WiredButton, WiredInput, WiredCombo, WiredItem } from 'wired-elements-react'
+import { API_URLS } from '../config/api'
 import './ShareDialog.css'
 
 function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser }) {
@@ -21,7 +22,7 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
         ? `/documents/${resourceId}/shares`
         : `/folders/${resourceId}/shares`
       
-      const response = await fetch(`http://localhost:3003${endpoint}`, {
+      const response = await fetch(`${API_URLS.docs}${endpoint}`, {
         headers: {
           'X-Username': currentUser.username
         }
@@ -57,8 +58,8 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
     try {
       // Fetch users and groups in parallel
       const [usersResponse, groupsResponse] = await Promise.all([
-        fetch('http://localhost:3001/api/users'),
-        fetch('http://localhost:3001/api/groups')
+        fetch(`${API_URLS.groups}/api/users`),
+        fetch(`${API_URLS.groups}/api/groups`)
       ])
 
       if (usersResponse.ok) {
@@ -303,7 +304,7 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
         }
       })
 
-      const response = await fetch('http://localhost:3003/shares', {
+      const response = await fetch(`${API_URLS.docs}/shares`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
