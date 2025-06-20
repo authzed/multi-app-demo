@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
-import { API_URLS } from '../config/api'
+import { API_URLS, apiRequest } from '../config/api'
 import ShareDialog from '../components/ShareDialog'
 import './PageLayout.css'
 
@@ -25,7 +25,7 @@ function FolderDetailPage({ currentUser }) {
         `${API_URLS.docs}/folders/${folderId}` : 
         `${API_URLS.docs}/folders/root`
       
-      const response = await fetch(url, {
+      const response = await apiRequest(url, {
         headers: {
           'X-Username': currentUser.username
         }
@@ -57,10 +57,9 @@ function FolderDetailPage({ currentUser }) {
     if (!newDocTitle.trim()) return
 
     try {
-      const response = await fetch(`${API_URLS.docs}/documents`, {
+      const response = await apiRequest(`${API_URLS.docs}/documents`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'X-Username': currentUser.username
         },
         body: JSON.stringify({
@@ -88,10 +87,9 @@ function FolderDetailPage({ currentUser }) {
     if (!newFolderName.trim()) return
 
     try {
-      const response = await fetch(`${API_URLS.docs}/folders`, {
+      const response = await apiRequest(`${API_URLS.docs}/folders`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'X-Username': currentUser.username
         },
         body: JSON.stringify({
@@ -119,7 +117,7 @@ function FolderDetailPage({ currentUser }) {
     }
 
     try {
-      const response = await fetch(`${API_URLS.docs}/documents/${docId}`, {
+      const response = await apiRequest(`${API_URLS.docs}/documents/${docId}`, {
         method: 'DELETE',
         headers: {
           'X-Username': currentUser.username
@@ -143,7 +141,7 @@ function FolderDetailPage({ currentUser }) {
     }
 
     try {
-      const response = await fetch(`${API_URLS.docs}/folders/${folderId}`, {
+      const response = await apiRequest(`${API_URLS.docs}/folders/${folderId}`, {
         method: 'DELETE',
         headers: {
           'X-Username': currentUser.username

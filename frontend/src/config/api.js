@@ -37,3 +37,18 @@ const getApiUrls = () => {
 };
 
 export const API_URLS = getApiUrls();
+
+// Centralized API fetch function with credentials
+export const apiRequest = async (url, options = {}) => {
+  const defaultOptions = {
+    method: 'GET',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+    ...options,
+  };
+
+  return fetch(url, defaultOptions);
+};

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
-import { API_URLS } from '../config/api'
+import { API_URLS, apiRequest } from '../config/api'
 import './PageLayout.css'
 
 function MailPage({ currentUser }) {
@@ -9,7 +9,7 @@ function MailPage({ currentUser }) {
 
   const fetchEmails = useCallback(async () => {
     try {
-      const response = await fetch('${API_URLS.mail}/emails/sent', {
+      const response = await apiRequest(`${API_URLS.mail}/emails/sent`, {
         headers: {
           'X-Username': currentUser.username
         }
@@ -31,9 +31,8 @@ function MailPage({ currentUser }) {
     try {
       // First, perform preflight check if there's a body
       if (newEmail.body.trim()) {
-        const preflightResponse = await fetch('${API_URLS.mail}/emails/preflight', {
+        const preflightResponse = await apiRequest(`${API_URLS.mail}/emails/preflight`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             to: newEmail.to,
             body: newEmail.body,
@@ -74,9 +73,8 @@ function MailPage({ currentUser }) {
         ...newEmail,
         from: currentUser.username + '@company.com'
       }
-      const response = await fetch('${API_URLS.mail}/emails/send', {
+      const response = await apiRequest(`${API_URLS.mail}/emails/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailToSend)
       })
       

@@ -6,7 +6,7 @@ import GroupDetailPage from './pages/GroupDetailPage'
 import MailPage from './pages/MailPage'
 import FolderDetailPage from './pages/FolderDetailPage'
 import DocumentEditPage from './pages/DocumentEditPage'
-import { API_URLS } from './config/api'
+import { API_URLS, apiRequest } from './config/api'
 import './App.css'
 
 function App() {
@@ -16,7 +16,7 @@ function App() {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URLS.groups}/api/users`)
+      const response = await apiRequest(`${API_URLS.groups}/api/users`)
       const userData = await response.json()
       setUsers(userData)
       
