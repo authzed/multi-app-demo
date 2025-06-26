@@ -40,9 +40,6 @@ public class Folder {
     @Column(name = "is_root", nullable = false)
     private Boolean isRoot = false;
     
-    @Column(name = "zedtoken")
-    private String zedtoken;
-
     public Folder() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -84,7 +81,4 @@ public class Folder {
 
     public Boolean getIsRoot() { return isRoot; }
     public void setIsRoot(Boolean isRoot) { this.isRoot = isRoot; }
-
-    public String getZedtoken() { return zedtoken; }
-    public void setZedtoken(String zedtoken) { this.zedtoken = zedtoken; }
 }

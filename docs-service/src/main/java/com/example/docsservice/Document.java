@@ -1,7 +1,6 @@
 package com.example.docsservice;
 
 import jakarta.persistence.*;
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -32,9 +31,6 @@ public class Document {
     
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
-    
-    @Column(name = "zedtoken")
-    private String zedtoken;
     
     @Transient
     private List<String> owners = new ArrayList<>();
@@ -74,9 +70,6 @@ public class Document {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
-
-    public String getZedtoken() { return zedtoken; }
-    public void setZedtoken(String zedtoken) { this.zedtoken = zedtoken; }
 
     public List<String> getOwners() { return owners; }
     public void setOwners(List<String> owners) { this.owners = owners; }
