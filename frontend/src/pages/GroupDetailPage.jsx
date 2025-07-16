@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredCombo, WiredItem } from 'wired-elements-react'
+import { API_URLS, apiRequest } from '../config/api'
 import './PageLayout.css'
 
 function GroupDetailPage({ currentUser }) {
@@ -17,7 +18,7 @@ function GroupDetailPage({ currentUser }) {
 
   const fetchGroupDetails = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3001/groups', {
+      const response = await apiRequest(`${API_URLS.groups}/groups`, {
         headers: {
           'X-Username': currentUser.username
         }
@@ -40,7 +41,7 @@ function GroupDetailPage({ currentUser }) {
 
   const fetchGroupMembers = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:3001/groups/${username}/members`, {
+      const response = await apiRequest(`${API_URLS.groups}/groups/${username}/members`, {
         headers: {
           'X-Username': currentUser.username
         }
@@ -64,7 +65,7 @@ function GroupDetailPage({ currentUser }) {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/users')
+      const response = await apiRequest(`${API_URLS.groups}/api/users`)
       const userData = await response.json()
       setUsers(userData)
     } catch (error) {
@@ -82,10 +83,9 @@ function GroupDetailPage({ currentUser }) {
     if (!newMemberUsername.trim()) return
 
     try {
-      const response = await fetch(`http://localhost:3001/groups/${username}/members`, {
+      const response = await apiRequest(`${API_URLS.groups}/groups/${username}/members`, {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
           'X-Username': currentUser.username
         },
         body: JSON.stringify({
@@ -119,7 +119,7 @@ function GroupDetailPage({ currentUser }) {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/groups/${username}/members/${memberUsername}`, {
+      const response = await apiRequest(`${API_URLS.groups}/groups/${username}/members/${memberUsername}`, {
         method: 'DELETE',
         headers: {
           'X-Username': currentUser.username
@@ -145,7 +145,7 @@ function GroupDetailPage({ currentUser }) {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/groups/${username}`, {
+      const response = await apiRequest(`${API_URLS.groups}/groups/${username}`, {
         method: 'DELETE',
         headers: {
           'X-Username': currentUser.username

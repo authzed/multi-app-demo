@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
+import { API_URLS, apiRequest } from '../config/api'
 import './PageLayout.css'
 
 function DocsPage({ currentUser }) {
@@ -8,7 +9,7 @@ function DocsPage({ currentUser }) {
 
   const fetchDocuments = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3003/documents', {
+      const response = await apiRequest(`${API_URLS.docs}/documents`, {
         headers: {
           'X-Username': currentUser.username
         }
@@ -28,10 +29,9 @@ function DocsPage({ currentUser }) {
     if (!newDoc.title.trim()) return
 
     try {
-      const response = await fetch('http://localhost:3003/documents', {
+      const response = await apiRequest(`${API_URLS.docs}/documents`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
+        headers: {
           'X-Username': currentUser.username
         },
         body: JSON.stringify({
