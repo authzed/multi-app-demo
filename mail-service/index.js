@@ -10,16 +10,6 @@ app.use(express.json());
 
 const sentEmails = [];
 
-// SpiceDB client setup
-let spiceDbClient;
-
-const initSpiceDB = async () => {
-  const token = process.env.SPICEDB_TOKEN || 'testtesttesttest';
-  const endpoint = process.env.SPICEDB_ENDPOINT || 'localhost:50051';
-
-  spiceDbClient = v1.NewClient(token, endpoint, v1.ClientSecurity.INSECURE_PLAINTEXT_CREDENTIALS);
-};
-
 const extractDocumentLinks = (text) => {
   const docLinkRegex = /https?:\/\/[^\/\s]+\/docs\/document\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/gi;
   const matches = [];
@@ -32,62 +22,9 @@ const extractDocumentLinks = (text) => {
   return matches;
 };
 
-const checkDocumentPermission = async (documentId, username, permission = 'view') => {
-  try {
-    const resource = v1.ObjectReference.create({
-      objectType: 'document',
-      objectId: documentId
-    });
-
-    const subject = v1.SubjectReference.create({
-      object: v1.ObjectReference.create({
-        objectType: 'user',
-        objectId: username
-      })
-    });
-
-    const checkRequest = v1.CheckPermissionRequest.create({
-      resource,
-      permission,
-      subject
-    });
-
-    // Log the SpiceDB check request parameters
-    console.log('SpiceDB CheckPermission Request:', {
-      resource: {
-        objectType: checkRequest.resource.objectType,
-        objectId: checkRequest.resource.objectId
-      },
-      permission: checkRequest.permission,
-      subject: {
-        object: {
-          objectType: checkRequest.subject.object.objectType,
-          objectId: checkRequest.subject.object.objectId
-        }
-      }
-    });
-
-    const response = await spiceDbClient.promises.checkPermission(checkRequest);
-
-    // Log the response as well
-    console.log('SpiceDB CheckPermission Response:', {
-      permissionship: response.permissionship,
-      checkedAt: response.checkedAt
-    });
-
-    return response.permissionship === v1.CheckPermissionResponse_Permissionship.HAS_PERMISSION;
-  } catch (error) {
-    console.error('SpiceDB permission check failed:', error);
-    return false;
-  }
-};
-
 const extractUsernameFromEmail = (email) => {
   return email.split('@')[0];
 };
-
-// Initialize SpiceDB on startup
-initSpiceDB().catch(console.error);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', service: 'mail' });
