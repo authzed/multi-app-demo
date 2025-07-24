@@ -42,7 +42,7 @@ export const API_URLS = getApiUrls();
 export const apiRequest = async (url, options = {}) => {
   const defaultOptions = {
     method: 'GET',
-    credentials: 'include',
+    credentials: url.includes('localhost') ? 'omit' : 'include',
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,

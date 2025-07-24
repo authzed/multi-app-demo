@@ -22,12 +22,6 @@ function Header({ users, currentUser, setCurrentUser }) {
             <Link to="/groups" className={isActive('/groups') ? 'active' : ''}>
               <WiredButton>Groups</WiredButton>
             </Link>
-            <Link to="/mail" className={isActive('/mail') ? 'active' : ''}>
-              <WiredButton>Mail</WiredButton>
-            </Link>
-            <Link to="/docs" className={isActive('/docs') ? 'active' : ''}>
-              <WiredButton>Docs</WiredButton>
-            </Link>
           </nav>
         </div>
         
