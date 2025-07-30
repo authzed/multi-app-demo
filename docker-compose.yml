@@ -15,44 +15,6 @@ services:
       timeout: 5s
       retries: 5
 
-  spicedb-migrate:
-    image: authzed/spicedb:latest
-    command: "migrate head"
-    environment:
-      - SPICEDB_DATASTORE_ENGINE=postgres
-      - SPICEDB_DATASTORE_CONN_URI=postgres://demo:demo123@postgres:5432/spicedb?sslmode=disable
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  spicedb:
-    image: authzed/spicedb:latest
-    command: "serve"
-    ports:
-      - "8080:8080"
-      - "9090:9090"
-      - "50051:50051"
-    environment:
-      - SPICEDB_GRPC_PRESHARED_KEY=testtesttesttest
-      - SPICEDB_DATASTORE_ENGINE=postgres
-      - SPICEDB_DATASTORE_CONN_URI=postgres://demo:demo123@postgres:5432/spicedb?sslmode=disable
-    depends_on:
-      - postgres
-      - spicedb-migrate
-    healthcheck:
-      test: ["CMD", "grpc_health_probe", "-v", "--addr", "localhost:50051", "-connect-timeout", "180s"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  spicedb-schema:
-    image: authzed/zed:latest
-    command: "schema write --endpoint=spicedb:50051 --token=testtesttesttest --insecure /schema/spicedb-schema.yaml"
-    volumes:
-      - ./spicedb-schema.yaml:/schema/spicedb-schema.yaml:ro
-    depends_on:
-      spicedb:
-        condition: service_healthy
 
   groups-service:
     build: ./groups-service
@@ -61,45 +23,10 @@ services:
     environment:
       - GIN_MODE=release
       - DATABASE_URL=postgres://demo:demo123@postgres:5432/groups_db?sslmode=disable
-      - SPICEDB_ENDPOINT=spicedb:50051
-      - SPICEDB_TOKEN=testtesttesttest
     depends_on:
       postgres:
         condition: service_healthy
-      spicedb-schema:
-        condition: service_completed_successfully
 
-  mail-service:
-    build: ./mail-service
-    ports:
-      - "3002:3002"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgres://demo:demo123@postgres:5432/mail_db
-      - SPICEDB_ENDPOINT=spicedb:50051
-      - SPICEDB_TOKEN=testtesttesttest
-    depends_on:
-      postgres:
-        condition: service_healthy
-      spicedb-schema:
-        condition: service_completed_successfully
-
-  docs-service:
-    build: ./docs-service
-    ports:
-      - "3003:3003"
-    environment:
-      - SPRING_PROFILES_ACTIVE=production
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/docs_db
-      - SPRING_DATASOURCE_USERNAME=demo
-      - SPRING_DATASOURCE_PASSWORD=demo123
-      - SPICEDB_ENDPOINT=spicedb:50051
-      - SPICEDB_TOKEN=testtesttesttest
-    depends_on:
-      postgres:
-        condition: service_healthy
-      spicedb-schema:
-        condition: service_completed_successfully
 
   frontend:
     build: ./frontend
@@ -107,8 +34,6 @@ services:
       - "3000:80"
     depends_on:
       - groups-service
-      - mail-service
-      - docs-service
 
 volumes:
   postgres_data:
