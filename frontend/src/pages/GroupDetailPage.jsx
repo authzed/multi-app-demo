@@ -108,10 +108,6 @@ function GroupDetailPage({ currentUser }) {
   }
 
   const removeMember = async (memberUsername) => {
-    if (!window.confirm(`Are you sure you want to remove ${memberUsername} from the group?`)) {
-      return
-    }
-
     try {
       const response = await apiRequest(`${API_URLS.groups}/groups/${username}/members/${memberUsername}`, {
         method: 'DELETE',
@@ -134,10 +130,6 @@ function GroupDetailPage({ currentUser }) {
   }
 
   const deleteGroup = async () => {
-    if (!window.confirm(`Are you sure you want to delete "${group.name}"? This action cannot be undone.`)) {
-      return
-    }
-
     try {
       const response = await apiRequest(`${API_URLS.groups}/groups/${username}`, {
         method: 'DELETE',
@@ -150,11 +142,11 @@ function GroupDetailPage({ currentUser }) {
         navigate('/groups')
       } else {
         const error = await response.json()
-        alert(`Failed to delete group: ${error.error || 'Unknown error'}`)
+        console.error(`Failed to delete group: ${error.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error deleting group:', error)
-      alert('Failed to delete group. Please try again.')
+      console.error('Failed to delete group. Please try again.')
     }
   }
 
