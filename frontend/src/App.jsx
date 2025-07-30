@@ -3,9 +3,6 @@ import { useState, useEffect, useCallback } from 'react'
 import Header from './components/Header'
 import GroupsPage from './pages/GroupsPage'
 import GroupDetailPage from './pages/GroupDetailPage'
-import MailPage from './pages/MailPage'
-import FolderDetailPage from './pages/FolderDetailPage'
-import DocumentEditPage from './pages/DocumentEditPage'
 import { API_URLS, apiRequest } from './config/api'
 import './App.css'
 
@@ -78,10 +75,6 @@ function App() {
           <Routes key={currentUser.id}>
             <Route path="/groups" element={<GroupsPage currentUser={currentUser} />} />
             <Route path="/groups/:username" element={<GroupDetailPage currentUser={currentUser} />} />
-            <Route path="/mail" element={<MailPage currentUser={currentUser} />} />
-            <Route path="/docs" element={<FolderDetailPage currentUser={currentUser} />} />
-            <Route path="/docs/folder/:folderId" element={<FolderDetailPage currentUser={currentUser} />} />
-            <Route path="/docs/document/:documentId" element={<DocumentEditPage currentUser={currentUser} />} />
             <Route path="/" element={<GroupsPage currentUser={currentUser} />} />
           </Routes>
         </main>
