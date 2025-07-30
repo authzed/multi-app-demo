@@ -1,15 +1,22 @@
 -- Groups service database schema
 
 -- Groups table (using username as primary key)
--- Note: No membership/ownership info stored here - SpiceDB is the source of truth
 CREATE TABLE IF NOT EXISTS groups (
     username VARCHAR(100) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
     visibility VARCHAR(50) DEFAULT 'PUBLIC' CHECK (visibility IN ('PUBLIC', 'PRIVATE', 'RESTRICTED')),
-    zedtoken VARCHAR(255), -- SpiceDB consistency token for read-after-write consistency
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Group members table for simple membership tracking
+CREATE TABLE IF NOT EXISTS group_members (
+    group_username VARCHAR(100) REFERENCES groups(username) ON DELETE CASCADE,
+    member_username VARCHAR(100) NOT NULL,
+    role VARCHAR(20) DEFAULT 'MEMBER' CHECK (role IN ('OWNER', 'MANAGER', 'MEMBER')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (group_username, member_username)
 );
 
 -- Messages table for group discussions (using group username)
@@ -26,9 +33,9 @@ CREATE TABLE IF NOT EXISTS messages (
 -- Indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_messages_group_username ON messages(group_username);
 CREATE INDEX IF NOT EXISTS idx_messages_sender_username ON messages(sender_username);
+CREATE INDEX IF NOT EXISTS idx_group_members_member ON group_members(member_username);
 
 -- Insert some sample data
--- Note: Group membership/ownership will be managed via SpiceDB relationships
 INSERT INTO groups (username, name, description) VALUES 
     ('engineering', 'Engineering Team', 'Software engineering discussions and updates'),
     ('product', 'Product Team', 'Product management and roadmap discussions')
