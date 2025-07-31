@@ -55,19 +55,15 @@ function GroupsPage({ currentUser }) {
         setNewGroup({ name: '', description: '', username: '' })
       } else {
         const error = await response.json()
-        alert(`Failed to create group: ${error.error || 'Unknown error'}`)
+        console.error(`Failed to create group: ${error.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error creating group:', error)
-      alert('Failed to create group. Please try again.')
+      console.error('Failed to create group. Please try again.')
     }
   }
 
   const deleteGroup = async (groupUsername, groupName) => {
-    if (!window.confirm(`Are you sure you want to delete "${groupName}"? This action cannot be undone.`)) {
-      return
-    }
-
     try {
       const response = await apiRequest(`${API_URLS.groups}/groups/${groupUsername}`, {
         method: 'DELETE',
@@ -80,11 +76,11 @@ function GroupsPage({ currentUser }) {
         setGroups(groups.filter(group => group.username !== groupUsername))
       } else {
         const error = await response.json()
-        alert(`Failed to delete group: ${error.error || 'Unknown error'}`)
+        console.error(`Failed to delete group: ${error.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error deleting group:', error)
-      alert('Failed to delete group. Please try again.')
+      console.error('Failed to delete group. Please try again.')
     }
   }
 
