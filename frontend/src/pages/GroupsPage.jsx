@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
 import { API_URLS, apiRequest } from '../config/api'
+import { notify, showConfirmation } from '../utils/notifications'
 import './PageLayout.css'
 
 function GroupsPage({ currentUser }) {
@@ -55,16 +56,17 @@ function GroupsPage({ currentUser }) {
         setNewGroup({ name: '', description: '', username: '' })
       } else {
         const error = await response.json()
-        alert(`Failed to create group: ${error.error || 'Unknown error'}`)
+        notify.error(`Failed to create group: ${error.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error creating group:', error)
-      alert('Failed to create group. Please try again.')
+      notify.error('Failed to create group. Please try again.')
     }
   }
 
   const deleteGroup = async (groupUsername, groupName) => {
-    if (!window.confirm(`Are you sure you want to delete "${groupName}"? This action cannot be undone.`)) {
+    const confirmed = await showConfirmation(`Are you sure you want to delete "${groupName}"? This action cannot be undone.`)
+    if (!confirmed) {
       return
     }
 
@@ -80,11 +82,11 @@ function GroupsPage({ currentUser }) {
         setGroups(groups.filter(group => group.username !== groupUsername))
       } else {
         const error = await response.json()
-        alert(`Failed to delete group: ${error.error || 'Unknown error'}`)
+        notify.error(`Failed to delete group: ${error.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error deleting group:', error)
-      alert('Failed to delete group. Please try again.')
+      notify.error('Failed to delete group. Please try again.')
     }
   }
 

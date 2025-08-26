@@ -5,7 +5,10 @@ const { v1 } = require('@authzed/authzed-node');
 const app = express();
 const PORT = 3002;
 
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 app.use(express.json());
 
 const sentEmails = [];

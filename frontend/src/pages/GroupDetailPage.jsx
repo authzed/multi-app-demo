@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredCombo, WiredItem } from 'wired-elements-react'
 import { API_URLS, apiRequest } from '../config/api'
+import { notify, showConfirmation } from '../utils/notifications'
 import './PageLayout.css'
 
 function GroupDetailPage({ currentUser }) {
@@ -105,16 +106,17 @@ function GroupDetailPage({ currentUser }) {
         }
       } else {
         const error = await response.json()
-        alert(`Failed to add member: ${error.error || 'Unknown error'}`)
+        notify.error(`Failed to add member: ${error.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error adding member:', error)
-      alert('Failed to add member. Please try again.')
+      notify.error('Failed to add member. Please try again.')
     }
   }
 
   const removeMember = async (memberUsername) => {
-    if (!window.confirm(`Are you sure you want to remove ${memberUsername} from the group?`)) {
+    const confirmed = await showConfirmation(`Are you sure you want to remove ${memberUsername} from the group?`)
+    if (!confirmed) {
       return
     }
 
@@ -131,16 +133,17 @@ function GroupDetailPage({ currentUser }) {
         await fetchGroupDetails() // Refresh to update owners list
       } else {
         const error = await response.json()
-        alert(`Failed to remove member: ${error.error || 'Unknown error'}`)
+        notify.error(`Failed to remove member: ${error.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error removing member:', error)
-      alert('Failed to remove member. Please try again.')
+      notify.error('Failed to remove member. Please try again.')
     }
   }
 
   const deleteGroup = async () => {
-    if (!window.confirm(`Are you sure you want to delete "${group.name}"? This action cannot be undone.`)) {
+    const confirmed = await showConfirmation(`Are you sure you want to delete "${group.name}"? This action cannot be undone.`)
+    if (!confirmed) {
       return
     }
 
@@ -156,11 +159,11 @@ function GroupDetailPage({ currentUser }) {
         navigate('/groups')
       } else {
         const error = await response.json()
-        alert(`Failed to delete group: ${error.error || 'Unknown error'}`)
+        notify.error(`Failed to delete group: ${error.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error deleting group:', error)
-      alert('Failed to delete group. Please try again.')
+      notify.error('Failed to delete group. Please try again.')
     }
   }
 

@@ -44,11 +44,15 @@ export const apiRequest = async (url, options = {}) => {
     method: 'GET',
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
       ...options.headers,
     },
     ...options,
   };
+
+  // Always set Content-Type for POST/PUT requests with a body
+  if (['POST', 'PUT', 'PATCH'].includes(defaultOptions.method?.toUpperCase()) && defaultOptions.body) {
+    defaultOptions.headers['Content-Type'] = 'application/json';
+  }
 
   return fetch(url, defaultOptions);
 };

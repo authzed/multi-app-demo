@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
 import { API_URLS, apiRequest } from '../config/api'
 import ShareDialog from '../components/ShareDialog'
+import { notify, showConfirmation } from '../utils/notifications'
 import './PageLayout.css'
 
 function DocumentEditPage({ currentUser }) {
@@ -76,13 +77,13 @@ function DocumentEditPage({ currentUser }) {
         const updatedDoc = await response.json()
         setDocument(updatedDoc)
         setOriginalDocument(updatedDoc)
-        alert('Document saved successfully!')
+        notify.success('Document saved successfully!')
       } else {
-        alert('Failed to save document')
+        notify.error('Failed to save document')
       }
     } catch (error) {
       console.error('Error saving document:', error)
-      alert('Failed to save document')
+      notify.error('Failed to save document')
     } finally {
       setSaving(false)
     }
@@ -93,7 +94,8 @@ function DocumentEditPage({ currentUser }) {
       return
     }
     
-    if (!window.confirm(`Are you sure you want to delete "${document.title}"?`)) {
+    const confirmed = await showConfirmation(`Are you sure you want to delete "${document.title}"?`)
+    if (!confirmed) {
       return
     }
 
@@ -117,11 +119,11 @@ function DocumentEditPage({ currentUser }) {
           navigate('/docs')
         }
       } else {
-        alert('Failed to delete document')
+        notify.error('Failed to delete document')
       }
     } catch (error) {
       console.error('Error deleting document:', error)
-      alert('Failed to delete document')
+      notify.error('Failed to delete document')
     }
   }
 

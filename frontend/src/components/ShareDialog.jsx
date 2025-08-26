@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { WiredCard, WiredButton, WiredInput, WiredCombo, WiredItem } from 'wired-elements-react'
 import { API_URLS, apiRequest } from '../config/api'
+import { notify } from '../utils/notifications'
 import './ShareDialog.css'
 
 function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser }) {
@@ -38,15 +39,15 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
         setShares(sharesWithType)
         setOriginalShares(sharesWithType)
       } else if (response.status === 403) {
-        alert('You do not have permission to manage sharing for this item')
+        notify.error('You do not have permission to manage sharing for this item')
         onClose()
       } else {
-        alert('Failed to load sharing information')
+        notify.error('Failed to load sharing information')
         onClose()
       }
     } catch (error) {
       console.error('Error fetching shares:', error)
-      alert('Failed to load sharing information')
+      notify.error('Failed to load sharing information')
       onClose()
     } finally {
       setLoading(false)
@@ -169,14 +170,14 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
 
   const addShare = () => {
     if (!newUsername || !newUsername.trim()) {
-      alert('Please select a user or group')
+      notify.error('Please select a user or group')
       return
     }
 
     // Check if user is already shared with
     const existingShare = shares.find(share => share.username === newUsername.trim())
     if (existingShare) {
-      alert('This user already has access. You can change their role by updating the existing share.')
+      notify.error('This user already has access. You can change their role by updating the existing share.')
       return
     }
 
@@ -318,16 +319,16 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
       })
 
       if (response.ok) {
-        alert('Sharing settings saved successfully!')
+        notify.success('Sharing settings saved successfully!')
         onClose()
       } else if (response.status === 403) {
-        alert('You do not have permission to manage sharing for this item')
+        notify.error('You do not have permission to manage sharing for this item')
       } else {
-        alert('Failed to save sharing settings')
+        notify.error('Failed to save sharing settings')
       }
     } catch (error) {
       console.error('Error saving shares:', error)
-      alert('Failed to save sharing settings')
+      notify.error('Failed to save sharing settings')
     } finally {
       setSaving(false)
     }
@@ -350,7 +351,7 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
       setTimeout(() => setCopyLinkSuccess(false), 2000)
     } catch (error) {
       console.error('Failed to copy link:', error)
-      alert('Failed to copy link to clipboard')
+      notify.error('Failed to copy link to clipboard')
     }
   }
 

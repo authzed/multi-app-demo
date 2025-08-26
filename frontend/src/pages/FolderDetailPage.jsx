@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { WiredCard, WiredButton, WiredInput, WiredTextarea } from 'wired-elements-react'
 import { API_URLS, apiRequest } from '../config/api'
 import ShareDialog from '../components/ShareDialog'
+import { notify, showConfirmation } from '../utils/notifications'
 import './PageLayout.css'
 
 function FolderDetailPage({ currentUser }) {
@@ -75,11 +76,12 @@ function FolderDetailPage({ currentUser }) {
         setShowNewDocForm(false)
         fetchFolderContents()
       } else {
-        alert('Failed to create document')
+        const errorData = await response.json().catch(() => ({}))
+        notify.error(`Failed to create document: ${errorData.error || response.statusText || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error creating document:', error)
-      alert('Failed to create document')
+      notify.error(`Failed to create document: ${error.message || 'Network error'}`)
     }
   }
 
@@ -103,16 +105,18 @@ function FolderDetailPage({ currentUser }) {
         setShowNewFolderForm(false)
         fetchFolderContents()
       } else {
-        alert('Failed to create folder')
+        const errorData = await response.json().catch(() => ({}))
+        notify.error(`Failed to create folder: ${errorData.error || response.statusText || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error creating folder:', error)
-      alert('Failed to create folder')
+      notify.error(`Failed to create folder: ${error.message || 'Network error'}`)
     }
   }
 
   const _deleteDocument = async (docId, docTitle) => {
-    if (!window.confirm(`Are you sure you want to delete "${docTitle}"?`)) {
+    const confirmed = await showConfirmation(`Are you sure you want to delete "${docTitle}"?`)
+    if (!confirmed) {
       return
     }
 
@@ -127,16 +131,17 @@ function FolderDetailPage({ currentUser }) {
       if (response.ok) {
         fetchFolderContents()
       } else {
-        alert('Failed to delete document')
+        notify.error('Failed to delete document')
       }
     } catch (error) {
       console.error('Error deleting document:', error)
-      alert('Failed to delete document')
+      notify.error('Failed to delete document')
     }
   }
 
   const deleteFolder = async (folderId, folderName) => {
-    if (!window.confirm(`Are you sure you want to delete "${folderName}" and all its contents?`)) {
+    const confirmed = await showConfirmation(`Are you sure you want to delete "${folderName}" and all its contents?`)
+    if (!confirmed) {
       return
     }
 
@@ -156,11 +161,11 @@ function FolderDetailPage({ currentUser }) {
           navigate('/docs')
         }
       } else {
-        alert('Failed to delete folder')
+        notify.error('Failed to delete folder')
       }
     } catch (error) {
       console.error('Error deleting folder:', error)
-      alert('Failed to delete folder')
+      notify.error('Failed to delete folder')
     }
   }
 
