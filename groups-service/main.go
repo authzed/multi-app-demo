@@ -459,7 +459,7 @@ func getGroups(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var groups []Group
+	groups := []Group{}
 	for rows.Next() {
 		var group Group
 		var createdAt time.Time
@@ -595,7 +595,7 @@ func getGroupMembersFromSpiceDB(groupUsername string) ([]map[string]string, erro
 		return nil, err
 	}
 
-	var members []map[string]string
+	members := []map[string]string{}
 	for {
 		response, err := stream.Recv()
 		if err != nil {
@@ -644,7 +644,7 @@ func getGroupOwnersFromSpiceDB(groupUsername string) ([]string, error) {
 		return nil, err
 	}
 
-	var owners []string
+	owners := []string{}
 	for {
 		response, err := stream.Recv()
 		if err != nil {
@@ -693,7 +693,7 @@ func getPublicGroups(c *gin.Context) {
 		CreatedAt   string `json:"created_at"`
 	}
 
-	var groups []PublicGroup
+	groups := []PublicGroup{}
 	for rows.Next() {
 		var group PublicGroup
 		var createdAt time.Time
@@ -812,7 +812,7 @@ func getGroupMembers(c *gin.Context) {
 		Role     string `json:"role"`
 	}
 
-	var members []Member
+	members := []Member{}
 	for _, memberInfo := range memberData {
 		members = append(members, Member{
 			Username: memberInfo["username"],
