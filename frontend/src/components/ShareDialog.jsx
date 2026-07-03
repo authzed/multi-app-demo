@@ -63,7 +63,7 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
 
       if (usersResponse.ok) {
         const usersData = await usersResponse.json()
-        setUsers(usersData)
+        setUsers(usersData || [])
       } else {
         console.error('Failed to fetch users from groups service')
         setUsers([])
@@ -71,7 +71,7 @@ function ShareDialog({ isOpen, onClose, resourceType, resourceId, currentUser })
 
       if (groupsResponse.ok) {
         const groupsData = await groupsResponse.json()
-        setGroups(groupsData)
+        setGroups(groupsData || [])
       } else {
         console.error('Failed to fetch groups from groups service')
         setGroups([])

@@ -14,7 +14,7 @@ function MailPage({ currentUser }) {
         }
       })
       const data = await response.json()
-      setEmails(data)
+      setEmails(data || [])
     } catch (error) {
       console.error('Error fetching emails:', error)
     }
