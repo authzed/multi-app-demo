@@ -22,7 +22,7 @@ function GroupDetailPage({ currentUser }) {
           'X-Username': currentUser.username
         }
       })
-      const groups = await response.json()
+      const groups = (await response.json()) || []
       const groupDetail = groups.find(g => g.username === username)
       
       if (groupDetail) {
@@ -53,7 +53,7 @@ function GroupDetailPage({ currentUser }) {
       
       if (response.ok) {
         const data = await response.json()
-        setMembers(data)
+        setMembers(data || [])
       } else {
         console.error('Error fetching group members:', response.statusText)
       }
@@ -66,7 +66,7 @@ function GroupDetailPage({ currentUser }) {
     try {
       const response = await fetch('http://localhost:3001/api/users')
       const userData = await response.json()
-      setUsers(userData)
+      setUsers(userData || [])
     } catch (error) {
       console.error('Error fetching users:', error)
     }

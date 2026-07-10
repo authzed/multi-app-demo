@@ -17,7 +17,7 @@ function App() {
     try {
       const response = await fetch('http://localhost:3001/api/users')
       const userData = await response.json()
-      setUsers(userData)
+      setUsers(userData || [])
       
       // Initialize current user from localStorage or default to first user
       const savedUserId = localStorage.getItem('selectedUserId')

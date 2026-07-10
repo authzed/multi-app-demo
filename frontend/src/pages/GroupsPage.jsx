@@ -20,7 +20,7 @@ function GroupsPage({ currentUser }) {
         }
       })
       const data = await response.json()
-      setGroups(data)
+      setGroups(data || [])
     } catch (error) {
       console.error('Error fetching groups:', error)
     }

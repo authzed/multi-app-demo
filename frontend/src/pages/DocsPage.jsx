@@ -14,7 +14,7 @@ function DocsPage({ currentUser }) {
         }
       })
       const data = await response.json()
-      setDocuments(data)
+      setDocuments(data || [])
     } catch (error) {
       console.error('Error fetching documents:', error)
     }
